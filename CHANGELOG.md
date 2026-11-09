@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/lukyanzhukov/ai-for-developers-project-386/compare/v1.0.0...v1.1.0) (2026-11-09)
+
+
+### Features
+
+* полный список встреч владельца ([#20](https://github.com/lukyanzhukov/ai-for-developers-project-386/issues/20)) ([#21](https://github.com/lukyanzhukov/ai-for-developers-project-386/issues/21)) ([b6db0ee](https://github.com/lukyanzhukov/ai-for-developers-project-386/commit/b6db0ee3dac7607c232f830ae0d8ec8474b7677a))
+
 ## 1.0.0 (2026-11-08)
 
 ### Features
