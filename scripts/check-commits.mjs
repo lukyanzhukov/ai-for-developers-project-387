@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 
-// Existing history predates Conventional Commits; validate only commits after adoption.
-const adoption = "29298e057b7997605d247504b2bef94beabcaabb";
+// Imported histories keep their original messages; validate commits after the migration baseline.
+const adoption = "0c971649965f6d80ccccea9560890fc3dee6380f";
 const to = process.env.COMMIT_TO || "HEAD";
 const requestedFrom = process.env.COMMIT_FROM;
 const from = requestedFrom && !/^0+$/.test(requestedFrom) ? requestedFrom : adoption;

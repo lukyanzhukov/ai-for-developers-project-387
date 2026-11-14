@@ -1,6 +1,6 @@
 # Issue tracker: GitHub
 
-Repository: `lukyanzhukov/ai-for-developers-project-386`.
+Repository: `lukyanzhukov/ai-for-developers-project-387`.
 
 Product decision maps and implementation tickets live as GitHub issues. Specification preparation is a workflow stage; the approved specification belongs in the implementation ticket. Use the `gh` CLI for tracker operations.
 

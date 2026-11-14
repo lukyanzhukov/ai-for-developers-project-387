@@ -1,6 +1,6 @@
 # Календарь звонков
 
-[![hexlet-check](https://github.com/lukyanzhukov/ai-for-developers-project-386/actions/workflows/hexlet-check.yml/badge.svg)](https://github.com/lukyanzhukov/ai-for-developers-project-386/actions)
+[![hexlet-check](https://github.com/lukyanzhukov/ai-for-developers-project-387/actions/workflows/hexlet-check.yml/badge.svg)](https://github.com/lukyanzhukov/ai-for-developers-project-387/actions)
 
 Сервис записи на встречи с одним владельцем календаря. Учебный проект [Хекслета](https://ru.hexlet.io/programs/ai-for-developers) по мотивам [Cal.com](https://cal.com/).
 [Исходное задание](https://files.hexlet.app/a/2ipc5m).
@@ -26,8 +26,8 @@
 Установите [mise](https://mise.jdx.dev/getting-started.html), затем:
 
 ```bash
-git clone https://github.com/lukyanzhukov/ai-for-developers-project-386.git
-cd ai-for-developers-project-386
+git clone https://github.com/lukyanzhukov/ai-for-developers-project-387.git
+cd ai-for-developers-project-387
 mise trust
 mise install
 mise run dev
@@ -267,3 +267,7 @@ gh workflow run lockfile-audit.yml --ref main -f exercise_ignore_until=true
  todo-audit.yml` (выключение/включение будущих запусков). Эти команды здесь только
 инструкция; фактические запуски, публикация issues и пользовательская приёмка
 сообщаются отдельно.
+
+## Перенос репозитория
+
+Проект и Git-история перенесены из [386](https://github.com/lukyanzhukov/ai-for-developers-project-386). Исходные задачи и PR #1–#70 скопированы с атрибуцией и сохранением номеров; PR представлены закрытыми архивными issues. Исторические ссылки changelog и ADR ведут к исходным свидетельствам. Начальное содержимое 387 сохранено в ветке `archive/387-before-migration`. Публичный Render URL сохраняется при перепривязке существующего сервиса; второй production не создаётся.
