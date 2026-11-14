@@ -2,19 +2,17 @@
 
 ## [1.2.0](https://github.com/lukyanzhukov/ai-for-developers-project-386/compare/v1.1.0...v1.2.0) (2026-11-14)
 
-
 ### Features
 
-* add independent scheduled source and lockfile audits ([#32](https://github.com/lukyanzhukov/ai-for-developers-project-386/issues/32)) ([2a7c81b](https://github.com/lukyanzhukov/ai-for-developers-project-386/commit/2a7c81b172fb6bc8c806b40b3e5f0a25da8f94d6))
-* **ci:** независимые аудиты TODO/FIXME и lockfile ([#32](https://github.com/lukyanzhukov/ai-for-developers-project-386/issues/32)) ([1e0d7d0](https://github.com/lukyanzhukov/ai-for-developers-project-386/commit/1e0d7d053556ff688ecb9fb025f357184e2383d4))
-
+- add independent scheduled source and lockfile audits ([#32](https://github.com/lukyanzhukov/ai-for-developers-project-386/issues/32)) ([2a7c81b](https://github.com/lukyanzhukov/ai-for-developers-project-386/commit/2a7c81b172fb6bc8c806b40b3e5f0a25da8f94d6))
+- **ci:** независимые аудиты TODO/FIXME и lockfile ([#32](https://github.com/lukyanzhukov/ai-for-developers-project-386/issues/32)) ([1e0d7d0](https://github.com/lukyanzhukov/ai-for-developers-project-386/commit/1e0d7d053556ff688ecb9fb025f357184e2383d4))
 
 ### Bug Fixes
 
-* **ci:** bound PR review context and pin helper model ([#29](https://github.com/lukyanzhukov/ai-for-developers-project-386/issues/29)) ([9a132ec](https://github.com/lukyanzhukov/ai-for-developers-project-386/commit/9a132ec8015e95614aaa269a8f47c596a6586da9))
-* **ci:** cap review iterations and disable web tools ([#29](https://github.com/lukyanzhukov/ai-for-developers-project-386/issues/29)) ([f66b94c](https://github.com/lukyanzhukov/ai-for-developers-project-386/commit/f66b94c590ceb9491ed1809f6e90c4c7d1987cef))
-* **ci:** pin free helper model in all OpenCode workflows ([#30](https://github.com/lukyanzhukov/ai-for-developers-project-386/issues/30)) ([1b35815](https://github.com/lukyanzhukov/ai-for-developers-project-386/commit/1b3581581962a9f6e310b2a18786423842f3acb8))
-* preserve audit evidence and replay provenance ([#32](https://github.com/lukyanzhukov/ai-for-developers-project-386/issues/32)) ([fb6151d](https://github.com/lukyanzhukov/ai-for-developers-project-386/commit/fb6151dc0fd9616fd33f768db1981e597e76d56b))
+- **ci:** bound PR review context and pin helper model ([#29](https://github.com/lukyanzhukov/ai-for-developers-project-386/issues/29)) ([9a132ec](https://github.com/lukyanzhukov/ai-for-developers-project-386/commit/9a132ec8015e95614aaa269a8f47c596a6586da9))
+- **ci:** cap review iterations and disable web tools ([#29](https://github.com/lukyanzhukov/ai-for-developers-project-386/issues/29)) ([f66b94c](https://github.com/lukyanzhukov/ai-for-developers-project-386/commit/f66b94c590ceb9491ed1809f6e90c4c7d1987cef))
+- **ci:** pin free helper model in all OpenCode workflows ([#30](https://github.com/lukyanzhukov/ai-for-developers-project-386/issues/30)) ([1b35815](https://github.com/lukyanzhukov/ai-for-developers-project-386/commit/1b3581581962a9f6e310b2a18786423842f3acb8))
+- preserve audit evidence and replay provenance ([#32](https://github.com/lukyanzhukov/ai-for-developers-project-386/issues/32)) ([fb6151d](https://github.com/lukyanzhukov/ai-for-developers-project-386/commit/fb6151dc0fd9616fd33f768db1981e597e76d56b))
 
 ## [1.1.0](https://github.com/lukyanzhukov/ai-for-developers-project-386/compare/v1.0.0...v1.1.0) (2026-11-09)
 
