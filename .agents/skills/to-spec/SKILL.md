@@ -16,7 +16,7 @@ Read the project's tracker document's **Workflow and artifacts** section for opt
 
 3. Describe the testing seams. Reuse ones the user has already approved. Propose any new seams as part of this draft for review, distinguishing automated checks from the user's acceptance scenario.
 
-4. Present the draft using the template below in the conversation, or update the draft location explicitly requested by the user. Ask for specification approval only if it has not already been given. Do not create a specification issue or apply a triage label at this stage. After approval, hand the draft to `/to-tickets` only if that next stage is authorized.
+4. Publish the draft using the template below as a GitHub issue with `workflow:spec` and the category label **at creation time**, per the tracker workflow. Read the complete source issue discussion; link the source request in the specification and post the specification URL back to the request. Mark unresolved questions explicitly and ask for actual human approval. Include main, negative and unchanged neighboring scenarios. After approval, hand the specification to `/to-tickets` only if that next stage is authorized.
 
 <spec-template>
 

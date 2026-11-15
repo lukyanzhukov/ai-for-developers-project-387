@@ -20,7 +20,7 @@ Communication to and from subagents should be sparse. Communicate primarily thro
 
 ## Steps
 
-1. Read the ticket specifications and product decision references to understand the task graph. Reuse their recorded approvals and testing seams. Check for unresolved product decisions before starting; do not make them silently during coding. State the current stage, intended deliverable, and verification plan.
+1. Read the ticket specifications and product decision references to understand the task graph. Reuse their recorded approvals and testing seams. For incoming-request work, read the source request and specification discussion, verify the human scope confirmation in the source request, and carry its comment URL into the implementation PR. Material scope changes return to the human. Check for unresolved product decisions before starting; do not make them silently during coding. State the current stage, intended deliverable, and verification plan.
 
 2. (optional) Use an **exploration subagent** to conduct any exploration required by the tickets - relevant codebase files or external documentation. Ensure the exploration subagent can save files - it should save its markdown notes in a directory outside the repo, accessible by all future subagents. This lets **implementer subagents** focus on implementation rather than exploration.
 
