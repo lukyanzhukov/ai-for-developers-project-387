@@ -1,9 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { runInNewContext } from "node:vm";
 import authorizeCommand from "../../scripts/opencode-command-policy.cjs";
 
 const repository = "lukyanzhukov/ai-for-developers-project-387";
-function fixture(eventName = "issue_comment", head = repository) {
+function fixture(eventName = "issue_comment", head = repository, base = repository) {
   const calls = [];
   const context = {
     eventName,
@@ -23,7 +25,7 @@ function fixture(eventName = "issue_comment", head = repository) {
           calls.push(args);
           return {
             data: {
-              base: { repo: { full_name: repository } },
+              base: { repo: { full_name: base } },
               head: { repo: head && { full_name: head } },
             },
           };
@@ -33,6 +35,52 @@ function fixture(eventName = "issue_comment", head = repository) {
   };
   return { github, context, calls };
 }
+
+test("workflow rejects fork review events before checkout", { timeout: 1000 }, () => {
+  const workflow = readFileSync(
+    new URL("../../.github/workflows/opencode.yml", import.meta.url),
+    "utf8",
+  );
+  const match = workflow.match(/  opencode:\n    if: \|\n([\s\S]*?)    runs-on:/);
+  assert.ok(match, "The job must have an explicit authorization condition before steps run");
+  // The actual job condition uses the common JS/GitHub expression subset.
+  // Evaluate it with event fixtures instead of checking for a particular string.
+  const allowed = (github) =>
+    runInNewContext(
+      `(${match[1]})`,
+      {
+        github,
+        contains: (body, mention) => body.toLowerCase().includes(mention.toLowerCase()),
+      },
+      { timeout: 100 },
+    );
+  for (const [head, expected] of [
+    [repository, true],
+    ["outsider/fork", false],
+  ]) {
+    const { context } = fixture("pull_request_review_comment");
+    context.payload.pull_request.head = { repo: { full_name: head } };
+    const github = {
+      event: context.payload,
+      event_name: context.eventName,
+      repository_owner: context.repo.owner,
+      repository,
+    };
+    assert.equal(allowed(github), expected, `Review event from ${head}`);
+    github.event.comment.user.type = "Bot";
+    assert.equal(allowed(github), false);
+  }
+  const { context } = fixture();
+  assert.equal(
+    allowed({
+      event: context.payload,
+      event_name: context.eventName,
+      repository_owner: context.repo.owner,
+      repository,
+    }),
+    true,
+  );
+});
 
 test("owner commands in an issue need no PR API call", { timeout: 1000 }, async () => {
   for (const command of [
@@ -109,5 +157,12 @@ for (const event of ["issue_comment", "pull_request_review_comment"]) {
       throw new Error("GitHub unavailable");
     };
     await assert.rejects(authorizeCommand(input), /GitHub unavailable/);
+  });
+
+  test(`${event}: a foreign base repository is rejected`, { timeout: 1000 }, async () => {
+    const input = fixture(event, repository, "outsider/other-base");
+    if (event === "issue_comment") input.context.payload.issue.pull_request = {};
+    assert.equal(await authorizeCommand(input), false);
+    assert.equal(input.calls.length, 1);
   });
 }
