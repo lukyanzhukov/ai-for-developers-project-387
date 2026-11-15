@@ -13,8 +13,21 @@ import { MonthCalendar } from "./MonthCalendar.tsx";
 import { useEffect, useState } from "react";
 import { listBookings } from "../generated/api/sdk.gen.ts";
 import type { BookingList } from "../generated/api/types.gen.ts";
+import { UpcomingBookingsSearchPrototype } from "./UpcomingBookingsSearchPrototype.tsx";
 
 export function UpcomingBookings() {
+  const params =
+    typeof window === "undefined"
+      ? new URLSearchParams()
+      : new URLSearchParams(window.location.search);
+  return params.get("prototype") === "search" ? (
+    <UpcomingBookingsSearchPrototype />
+  ) : (
+    <LiveUpcomingBookings />
+  );
+}
+
+function LiveUpcomingBookings() {
   const [data, setData] = useState<BookingList>();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
