@@ -27,6 +27,7 @@ jobs:
       contents: read
       id-token: write
       pull-requests: read
+      issues: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -62,6 +63,7 @@ jobs:
           MODEL: opencode/big-pickle
           MENTIONS: /oc,/opencode
           USE_GITHUB_TOKEN: "false"
+          GH_TOKEN: ${{ github.token }}
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
           OPENCODE_PERMISSION: '{"external_directory":{"*":"deny","${{ runner.temp }}/_github_workflow/*":"allow"},"doom_loop":"deny","question":"deny","plan_enter":"deny","plan_exit":"deny","read":{"*.env":"deny","*.env.*":"deny","*.env.example":"allow"}}'
           OPENCODE_CONFIG_CONTENT: '{"model":"opencode/big-pickle","small_model":"opencode/big-pickle","agent":{"title":{"disable":true}}}'

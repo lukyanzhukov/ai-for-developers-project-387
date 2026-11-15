@@ -21,7 +21,7 @@ jobs:
     permissions:
       contents: read
       id-token: write
-      issues: read
+      issues: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
@@ -42,6 +42,7 @@ jobs:
         env:
           MODEL: opencode/big-pickle
           USE_GITHUB_TOKEN: "false"
+          GH_TOKEN: ${{ github.token }}
           PROMPT: |
             Разбери новое обращение по .agents/skills/triage/SKILL.md.
             Прочитай AGENTS.md, docs/agents/issue-tracker.md и docs/agents/triage-labels.md,
