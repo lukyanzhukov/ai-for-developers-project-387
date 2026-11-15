@@ -22,7 +22,7 @@ jobs:
         contains(github.event.comment.body, '/opencode')
       )
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 15
     permissions:
       contents: read
       id-token: write
@@ -58,7 +58,7 @@ jobs:
 
       - name: Run OpenCode
         if: steps.target.outputs.result == 'true'
-        timeout-minutes: 4
+        timeout-minutes: 12
         env:
           MODEL: opencode/big-pickle
           MENTIONS: /oc,/opencode
@@ -67,4 +67,4 @@ jobs:
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
           OPENCODE_PERMISSION: '{"external_directory":{"*":"deny","${{ runner.temp }}/_github_workflow/*":"allow"},"doom_loop":"deny","question":"deny","plan_enter":"deny","plan_exit":"deny","read":{"*.env":"deny","*.env.*":"deny","*.env.example":"allow"}}'
           OPENCODE_CONFIG_CONTENT: '{"model":"opencode/big-pickle","small_model":"opencode/big-pickle","agent":{"title":{"disable":true}}}'
-        run: timeout -k 10s 180s mise exec opencode@1.19.5 -- opencode github run < /dev/null
+        run: timeout -k 10s 600s mise exec opencode@1.19.5 -- opencode github run < /dev/null
