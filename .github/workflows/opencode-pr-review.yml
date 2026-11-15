@@ -37,12 +37,13 @@ jobs:
           version: 2026.10.19
 
       - name: Review with OpenCode CLI
+        timeout-minutes: 8
         env:
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           OPENCODE_CONFIG_CONTENT: '{"model":"opencode/big-pickle","small_model":"opencode/big-pickle","agent":{"plan":{"steps":5},"title":{"disable":true}}}'
-          OPENCODE_PERMISSION: '{"edit":"deny","websearch":"deny","webfetch":"deny","task":"deny","bash":{"*":"deny","gh pr view *":"allow","gh pr diff *":"allow","gh pr checks *":"allow","gh issue view *":"allow","gh run view *":"allow","git diff *":"allow","git log *":"allow","git show *":"allow","git status*":"allow"}}'
+          OPENCODE_PERMISSION: '{"edit":"deny","websearch":"deny","webfetch":"deny","task":"deny","bash":{"*":"deny","gh pr view *":"allow","gh pr diff *":"allow","gh pr checks *":"allow","gh issue view *":"allow","gh run view *":"allow","git diff *":"allow","git log *":"allow","git show *":"allow","git status*":"allow"},"external_directory":{"*":"deny","${{ runner.temp }}/_github_workflow/*":"allow"},"doom_loop":"deny","question":"deny","plan_enter":"deny","plan_exit":"deny","read":{"*.env":"deny","*.env.*":"deny","*.env.example":"allow"}}'
         run: |
           set -euo pipefail
           timeout -k 10s 420s mise exec opencode@1.19.5 -- opencode run --print-logs --log-level INFO --model opencode/big-pickle --agent plan --format json \

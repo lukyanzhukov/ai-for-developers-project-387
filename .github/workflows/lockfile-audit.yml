@@ -80,6 +80,7 @@ jobs:
         if: inputs.exercise_ignore_until && inputs.source_run_id == ''
         run: node scripts/osv-ignore-lab.mjs --scanner "$RUNNER_TEMP/osv-scanner" --output "$RUNNER_TEMP/audit/ignore-until-lab"
       - name: Analyze read-only snapshot
+        timeout-minutes: 8
         id: analyze
         env:
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
