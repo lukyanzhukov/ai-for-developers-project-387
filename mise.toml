@@ -83,8 +83,12 @@ run = "node scripts/check-commits.mjs"
 [tasks."audit:test"]
 run = "node --test tests/audit/*.test.mjs"
 
+[tasks."agents:test"]
+run = "node --test tests/agents/*.test.mjs"
+
 [tasks.check]
 run = [
+  "mise run agents:test",
   "mise run audit:test",
   "mise run generate:check",
   "hk check --all",

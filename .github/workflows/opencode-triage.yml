@@ -37,18 +37,27 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
+      - name: Install pinned OpenCode
+        if: steps.check.outputs.result == 'true'
+        timeout-minutes: 1
+        uses: jdx/mise-action@5228313ee0372e111a38da051671ca30fc5a96db # v3
+        with:
+          version: 2026.10.19
+          working_directory: ${{ runner.temp }}
+          install_args: opencode@1.19.5
+
       - name: Run OpenCode
         timeout-minutes: 4
         if: steps.check.outputs.result == 'true'
-        uses: anomalyco/opencode/github@810c0eba1a7348036f8bdf61e6632d0c36c6876c # v1.19.5
         env:
-          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
-          OPENCODE_PERMISSION: '{"external_directory":{"*":"deny","${{ runner.temp }}/_github_workflow/*":"allow"},"doom_loop":"deny","question":"deny","plan_enter":"deny","plan_exit":"deny","read":{"*.env":"deny","*.env.*":"deny","*.env.example":"allow"}}'
-          OPENCODE_CONFIG_CONTENT: '{"model":"opencode/big-pickle","small_model":"opencode/big-pickle","agent":{"title":{"disable":true}}}'
-        with:
-          model: opencode/big-pickle
-          prompt: |
+          MODEL: opencode/big-pickle
+          USE_GITHUB_TOKEN: "false"
+          PROMPT: |
             Review this issue. If there's a clear fix or relevant docs:
             - Provide documentation links
             - Add error handling guidance for code examples
             Otherwise, do not comment.
+          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+          OPENCODE_PERMISSION: '{"external_directory":{"*":"deny","${{ runner.temp }}/_github_workflow/*":"allow"},"doom_loop":"deny","question":"deny","plan_enter":"deny","plan_exit":"deny","read":{"*.env":"deny","*.env.*":"deny","*.env.example":"allow"}}'
+          OPENCODE_CONFIG_CONTENT: '{"model":"opencode/big-pickle","small_model":"opencode/big-pickle","agent":{"title":{"disable":true}}}'
+        run: timeout -k 10s 180s mise exec opencode@1.19.5 -- opencode github run < /dev/null
