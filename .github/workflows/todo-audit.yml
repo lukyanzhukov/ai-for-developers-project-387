@@ -65,6 +65,7 @@ jobs:
           retention-days: 30
           if-no-files-found: warn
       - name: Analyze read-only snapshot
+        timeout-minutes: 8
         id: analyze
         env:
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
