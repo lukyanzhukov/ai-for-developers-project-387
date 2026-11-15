@@ -82,6 +82,47 @@ test("workflow rejects fork review events before checkout", { timeout: 1000 }, (
   );
 });
 
+test(
+  "workflow gates installation and the model secret on target authorization",
+  { timeout: 1000 },
+  async () => {
+    const workflow = readFileSync(
+      new URL("../../.github/workflows/opencode.yml", import.meta.url),
+      "utf8",
+    );
+    for (const name of ["Install pinned OpenCode", "Run OpenCode"]) {
+      const block = workflow.split(`      - name: ${name}\n`)[1]?.split("      - name:")[0];
+      assert.ok(block, `${name} step must exist`);
+      const condition = block.match(/^        if: (.+)$/m)?.[1];
+      assert.ok(condition, `${name} must require successful target authorization`);
+      for (const head of [repository, "outsider/fork"]) {
+        const input = fixture("issue_comment", head);
+        input.context.payload.issue.pull_request = {};
+        const result = String(await authorizeCommand(input));
+        const allowed = runInNewContext(
+          `(${condition})`,
+          {
+            steps: { target: { outputs: { result } } },
+          },
+          { timeout: 100 },
+        );
+        assert.equal(allowed, head === repository, `${name} for ${head}`);
+      }
+      // A failed authorization step produces no success output.
+      assert.equal(
+        runInNewContext(
+          `(${condition})`,
+          {
+            steps: { target: { outputs: {} } },
+          },
+          { timeout: 100 },
+        ),
+        false,
+      );
+    }
+  },
+);
+
 test("owner commands in an issue need no PR API call", { timeout: 1000 }, async () => {
   for (const command of [
     "/oc explain this issue",
