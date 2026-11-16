@@ -1,4 +1,5 @@
 import {
+  ActionIcon,
   Alert,
   Badge,
   Button,
@@ -7,6 +8,7 @@ import {
   SegmentedControl,
   Stack,
   Text,
+  TextInput,
   Title,
 } from "@mantine/core";
 import { MonthCalendar } from "./MonthCalendar.tsx";
@@ -14,12 +16,41 @@ import { useEffect, useState } from "react";
 import { listBookings } from "../generated/api/sdk.gen.ts";
 import type { BookingList } from "../generated/api/types.gen.ts";
 
+function normalize(value: string) {
+  return value.trim().toLocaleLowerCase("ru-RU");
+}
+
+function SearchGlyph() {
+  return (
+    <svg className="owner-search-glyph" viewBox="0 0 20 20" aria-hidden="true">
+      <circle cx="9" cy="9" r="5.5" />
+      <path d="m13.2 13.2 3.3 3.3" />
+    </svg>
+  );
+}
+
+function Highlight({ text, query }: { text: string; query: string }) {
+  const needle = normalize(query);
+  if (!needle) return <>{text}</>;
+  const source = text.toLocaleLowerCase("ru-RU");
+  const index = source.indexOf(needle);
+  if (index < 0) return <>{text}</>;
+  return (
+    <>
+      {text.slice(0, index)}
+      <mark>{text.slice(index, index + needle.length)}</mark>
+      {text.slice(index + needle.length)}
+    </>
+  );
+}
+
 export function UpcomingBookings() {
   const [data, setData] = useState<BookingList>();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [date, setDate] = useState("");
   const [mode, setMode] = useState("list");
+  const [query, setQuery] = useState("");
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     const controller = new AbortController();
@@ -47,17 +78,39 @@ export function UpcomingBookings() {
       day: "2-digit",
     }).format(new Date(instant));
   const today = data ? dateKey(data.serverNow) : "";
-  const dates = data?.items.map((item) => dateKey(item.startsAt)) ?? [];
-  const lastDate = dates.at(-1) ?? today;
+  const allItems = data?.items ?? [];
+  const allDates = allItems.map((item) => dateKey(item.startsAt));
+  const lastDate = allDates.at(-1) ?? today;
   const endOfMonth = data ? new Date(`${lastDate.slice(0, 7)}-01T12:00:00Z`) : undefined;
   endOfMonth?.setUTCMonth(endOfMonth.getUTCMonth() + 1);
   endOfMonth?.setUTCDate(0);
   const end = endOfMonth?.toISOString().slice(0, 10) ?? "";
-  const selectedDate = date >= today && date <= end ? date : (dates[0] ?? today);
+  const selectedDate = date >= today && date <= end ? date : (allDates[0] ?? today);
+  const needle = normalize(query);
+  const searching = needle.length > 0;
+  const matches = searching
+    ? allItems.filter(
+        (item) =>
+          normalize(item.guestName).includes(needle) || normalize(item.guestEmail).includes(needle),
+      )
+    : allItems;
   const meetings =
-    data?.items.filter((item) => mode === "list" || dateKey(item.startsAt) === selectedDate) ?? [];
+    mode === "calendar" && !searching
+      ? matches.filter((item) => dateKey(item.startsAt) === selectedDate)
+      : matches;
+  const markedDates = searching
+    ? [...new Set(matches.map((item) => dateKey(item.startsAt)))]
+    : allDates;
   const counts = new Map<string, number>();
-  for (const day of dates) counts.set(day, (counts.get(day) ?? 0) + 1);
+  for (const item of meetings) {
+    const day = dateKey(item.startsAt);
+    counts.set(day, (counts.get(day) ?? 0) + 1);
+  }
+  const countLabel = searching
+    ? `Совпадений: ${matches.length}`
+    : mode === "list"
+      ? `Всего: ${meetings.length}`
+      : `На выбранный день: ${meetings.length}`;
   const dayLabel = (day: string) => {
     const label = new Intl.DateTimeFormat("ru-RU", {
       weekday: day === today ? undefined : "long",
@@ -90,6 +143,40 @@ export function UpcomingBookings() {
           {error ? "Повторить" : "Обновить"}
         </Button>
       </Group>
+      <Paper withBorder p="lg" radius="lg" className="owner-search-field">
+        <TextInput
+          aria-label="Поиск по имени или email"
+          placeholder="Имя или email гостя"
+          value={query}
+          onChange={(event) => setQuery(event.currentTarget.value)}
+          leftSection={<SearchGlyph />}
+          rightSection={
+            query ? (
+              <ActionIcon
+                variant="subtle"
+                color="gray"
+                size="sm"
+                radius="xl"
+                aria-label="Очистить поиск"
+                onClick={() => setQuery("")}
+              >
+                ×
+              </ActionIcon>
+            ) : undefined
+          }
+          rightSectionPointerEvents="all"
+        />
+        <Group justify="space-between" mt="sm" gap="xs">
+          <Text size="xs" c="dimmed">
+            Часть имени или email, без учёта регистра
+          </Text>
+          {data && (
+            <Text size="xs" fw={600} className="owner-search-count">
+              {countLabel}
+            </Text>
+          )}
+        </Group>
+      </Paper>
       <Group justify="space-between">
         <SegmentedControl
           className="owner-view-toggle"
@@ -126,9 +213,7 @@ export function UpcomingBookings() {
         />
         {data && (
           <Text size="sm" c="dimmed">
-            {mode === "list"
-              ? `Всего: ${meetings.length}`
-              : `На выбранный день: ${meetings.length}`}
+            {countLabel}
           </Text>
         )}
       </Group>
@@ -150,7 +235,7 @@ export function UpcomingBookings() {
             <MonthCalendar
               start={today}
               end={end}
-              markedDates={dates}
+              markedDates={markedDates}
               date={selectedDate}
               onChange={setDate}
               legend="Есть встречи"
@@ -159,18 +244,28 @@ export function UpcomingBookings() {
           <section
             className={mode === "calendar" ? "owner-agenda" : "owner-list"}
             aria-label={
-              mode === "calendar" ? "Встречи на выбранную дату" : "Все предстоящие встречи"
+              mode === "calendar"
+                ? searching
+                  ? "Все совпадения"
+                  : "Встречи на выбранную дату"
+                : "Все предстоящие встречи"
             }
           >
             {mode === "calendar" && (
               <Title order={3} size="h4" mb="lg">
-                {dayLabel(selectedDate)}
+                {searching ? "Совпадения по всем датам" : dayLabel(selectedDate)}
               </Title>
             )}
             {meetings.length === 0 ? (
-              <Text component="output" c="dimmed">
-                {data.items.length ? "На этот день встреч нет" : "Предстоящих встреч пока нет"}
-              </Text>
+              searching ? (
+                <Text component="output" c="dimmed" className="owner-search-empty">
+                  Ничего не найдено
+                </Text>
+              ) : (
+                <Text component="output" c="dimmed">
+                  {data.items.length ? "На этот день встреч нет" : "Предстоящих встреч пока нет"}
+                </Text>
+              )
             ) : (
               <Stack
                 component="ul"
@@ -190,7 +285,7 @@ export function UpcomingBookings() {
                   });
                   return (
                     <li key={item.id}>
-                      {mode === "list" &&
+                      {(mode === "list" || searching) &&
                         (index === 0 ||
                           dateKey(meetings[index - 1].startsAt) !== dateKey(item.startsAt)) && (
                           <Group justify="space-between" className="owner-date-heading">
@@ -219,10 +314,11 @@ export function UpcomingBookings() {
                             )}
                           </Group>
                           <Text size="sm">
-                            {item.guestName} · {item.durationMinutes} мин
+                            <Highlight text={item.guestName} query={query} /> ·{" "}
+                            {item.durationMinutes} мин
                           </Text>
                           <Text size="sm" c="dimmed">
-                            {item.guestEmail}
+                            <Highlight text={item.guestEmail} query={query} />
                           </Text>
                           {item.note && (
                             <Text size="sm" c="dimmed" style={{ whiteSpace: "pre-wrap" }}>

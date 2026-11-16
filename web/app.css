@@ -993,6 +993,45 @@ h3 {
   stroke-linejoin: round;
 }
 
+.owner-search-field {
+  background: linear-gradient(180deg, #fffdf8, #f7f5ef);
+  border-color: #dcd7ca;
+}
+.owner-search-field .mantine-Input-input {
+  background: #fff;
+  border-color: #dcd8ce;
+}
+.owner-search-field .mantine-Input-input:focus {
+  border-color: #5e5a51;
+}
+.owner-search-glyph {
+  width: 17px;
+  height: 17px;
+  color: #7b766c;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.owner-search-count {
+  font-variant-numeric: tabular-nums;
+}
+.owner-booking-card mark {
+  padding: 0 1px;
+  color: inherit;
+  background: #f1dc9d;
+  border-radius: 2px;
+}
+.owner-search-empty {
+  display: block;
+  padding: 36px 20px;
+  text-align: center;
+  background: #fbfaf7;
+  border: 1px dashed #d7d2c7;
+  border-radius: 12px;
+}
+
 .owner-date-heading {
   margin: 16px 0 12px;
 }
