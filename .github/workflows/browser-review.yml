@@ -1,0 +1,130 @@
+name: Independent browser review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Pull request number
+        required: true
+        type: string
+
+permissions: {}
+
+concurrency:
+  group: browser-review-${{ github.event.pull_request.number || inputs.pr_number }}
+  cancel-in-progress: true
+
+jobs:
+  browser:
+    permissions:
+      contents: read
+      pull-requests: write
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.actor == github.repository_owner) ||
+      (github.event_name == 'pull_request' && !github.event.pull_request.draft &&
+       github.event.pull_request.head.repo.full_name == github.repository &&
+       (github.event.pull_request.user.login == github.repository_owner ||
+        github.event.pull_request.user.login == 'opencode-agent[bot]'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout checker
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Resolve PR and preserve independent checker
+        id: target
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
+        with:
+          script: |
+            const fs = require('node:fs');
+            const { execFileSync } = require('node:child_process');
+            const { target } = require('./scripts/review-policy.cjs');
+            const pr = await target({ github, context });
+            for (const [key, value] of Object.entries(pr)) core.setOutput(key, String(value));
+            execFileSync('git', ['cat-file', '-e', pr.baseSha]);
+            const exists = execFileSync('git', ['ls-tree', '--name-only', pr.baseSha, 'scripts/browser-review.mjs'], { encoding: 'utf8' }).trim();
+            let checker;
+            let checkerSha = pr.baseSha;
+            if (exists === 'scripts/browser-review.mjs') {
+              checker = execFileSync('git', ['show', `${pr.baseSha}:scripts/browser-review.mjs`], { encoding: 'utf8' });
+            } else {
+              // Initial introduction only. Git/API errors must not choose PR code.
+              checker = fs.readFileSync('scripts/browser-review.mjs', 'utf8');
+              checkerSha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+              core.notice('Bootstrapping browser checker; its source SHA is recorded in the report.');
+            }
+            fs.writeFileSync(`${process.env.RUNNER_TEMP}/browser-review.mjs`, checker);
+            core.setOutput('checkerSha', checkerSha);
+
+      - name: Checkout exact PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ steps.target.outputs.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Install toolchain
+        uses: jdx/mise-action@5228313ee0372e111a38da051671ca30fc5a96db # v3
+        with:
+          version: 2026.10.19
+
+      - name: Install and build application
+        run: |
+          mise run install
+          mise run build
+
+      - name: Check browser scenarios
+        timeout-minutes: 3
+        env:
+          REVIEW_SHA: ${{ steps.target.outputs.sha }}
+          CHECKER_SHA: ${{ steps.target.outputs.checkerSha }}
+          PR_NUMBER: ${{ steps.target.outputs.number }}
+          RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          EVIDENCE_DIR: ${{ runner.temp }}/browser-evidence
+        run: timeout -k 10s 120s mise exec -- node "$RUNNER_TEMP/browser-review.mjs"
+
+      - name: Verify head is still current
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
+        env:
+          PR_NUMBER: ${{ steps.target.outputs.number }}
+          REVIEW_SHA: ${{ steps.target.outputs.sha }}
+        with:
+          script: |
+            const fs = require('node:fs');
+            const { data: pr } = await github.rest.pulls.get({ ...context.repo, pull_number: Number(process.env.PR_NUMBER) });
+            if (pr.head.sha !== process.env.REVIEW_SHA || pr.state !== 'open') {
+              const path = `${process.env.RUNNER_TEMP}/browser-evidence/report.json`;
+              const report = JSON.parse(fs.readFileSync(path, 'utf8'));
+              report.status = 'stale';
+              report.currentSha = pr.head.sha;
+              fs.writeFileSync(path, JSON.stringify(report, null, 2));
+              fs.writeFileSync(`${process.env.RUNNER_TEMP}/browser-evidence/report.md`, `OUTDATED: checked ${process.env.REVIEW_SHA}; current ${pr.head.sha}. Do not use as current evidence.`);
+              core.setFailed('Browser result is stale. A new head requires a new check.');
+            }
+
+      - name: Save browser evidence
+        if: always()
+        id: artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: browser-${{ steps.target.outputs.number }}-${{ steps.target.outputs.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/browser-evidence/
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Link browser report
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
+        env:
+          PR_NUMBER: ${{ steps.target.outputs.number }}
+          REVIEW_SHA: ${{ steps.target.outputs.sha }}
+          ARTIFACT_URL: ${{ steps.artifact.outputs.artifact-url }}
+        with:
+          script: |
+            const { data: pr } = await github.rest.pulls.get({ ...context.repo, pull_number: Number(process.env.PR_NUMBER) });
+            if (pr.head.sha !== process.env.REVIEW_SHA || pr.state !== 'open') throw new Error('Head changed before publication');
+            await github.rest.issues.createComment({ ...context.repo, issue_number: pr.number, body: `Браузерная проверка пройдена. Head SHA: \`${process.env.REVIEW_SHA}\`. Основной, негативный и соседний сценарии поиска по #84 проверены отдельно от реализации. [Отчёт и снимки](${process.env.ARTIFACT_URL}).` });
