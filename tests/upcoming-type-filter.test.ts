@@ -89,6 +89,19 @@ const bookings = [
   ),
 ];
 
+const viewports = [
+  { width: 1280, height: 900 },
+  { width: 390, height: 844 },
+];
+
+const errorTexts = {
+  load: "Не удалось загрузить типы встреч. Попробуйте ещё раз.",
+  refresh: "Не удалось обновить типы встреч. Показан ранее загруженный список",
+};
+
+type Viewport = (typeof viewports)[number];
+type Server = Awaited<ReturnType<typeof startServer>>;
+
 const typeCombobox = (page: Page) =>
   page.getByRole("combobox", { name: "Тип встречи", exact: true });
 
@@ -114,8 +127,8 @@ async function countText(page: Page) {
 async function withPage(
   types: MeetingType[],
   options: Parameters<typeof startServer>[1],
-  run: (page: Page, server: Awaited<ReturnType<typeof startServer>>) => Promise<void>,
-  viewport: { width: number; height: number } = { width: 1280, height: 900 },
+  run: (page: Page, server: Server) => Promise<void>,
+  viewport: Viewport,
 ) {
   const server = await startServer(types, options);
   let browser: Browser | undefined;
@@ -134,7 +147,7 @@ async function withPage(
   }
 }
 
-test("owner sees the meeting type filter on the upcoming bookings page", async () => {
+async function fieldIsPresent(viewport: Viewport) {
   await withPage(
     meetingTypes,
     { now: ["2026-11-09T01:00:00Z"], bookings },
@@ -143,10 +156,11 @@ test("owner sees the meeting type filter on the upcoming bookings page", async (
       await page.getByLabel("Поиск по имени или email", { exact: true }).waitFor();
       expect(await typeCombobox(page).count()).toBe(1);
     },
+    viewport,
   );
-});
+}
 
-test("owner filters by one or several meeting types together with the guest search", async () => {
+async function filtersTogetherWithSearch(viewport: Viewport) {
   await withPage(
     meetingTypes,
     { now: ["2026-11-09T01:00:00Z"], bookings },
@@ -155,6 +169,7 @@ test("owner filters by one or several meeting types together with the guest sear
       await page.getByLabel("Поиск по имени или email", { exact: true }).waitFor();
       expect(await typeCombobox(page).count()).toBe(1);
       await page.getByText("Анна Иванова").first().waitFor();
+      const search = page.getByLabel("Поиск по имени или email", { exact: true });
 
       await chooseType(page, "Знакомство");
       expect(await page.getByText("Анна Иванова").count()).toBe(1);
@@ -164,18 +179,20 @@ test("owner filters by one or several meeting types together with the guest sear
       await chooseType(page, "Консультация");
       expect(await countText(page)).toBe("Совпадений: 5");
 
-      await page.getByLabel("Поиск по имени или email", { exact: true }).fill("анна");
+      await search.fill("анна");
       await page.getByText("Анна Иванова").first().waitFor();
       expect(await countText(page)).toBe("Совпадений: 1");
 
       await page.getByLabel("Очистить поиск", { exact: true }).click();
       expect(await countText(page)).toBe("Совпадений: 5");
 
+      await search.fill("виктор");
+      expect(await countText(page)).toBe("Совпадений: 1");
       await clearTypes(page, 2);
+      expect(await search.inputValue()).toBe("виктор");
+      expect(await countText(page)).toBe("Совпадений: 1");
+      await page.getByLabel("Очистить поиск", { exact: true }).click();
       expect(await countText(page)).toBe("Всего: 6");
-      expect(await page.getByLabel("Поиск по имени или email", { exact: true }).inputValue()).toBe(
-        "",
-      );
 
       await typeCombobox(page).click();
       const inactive = page.getByRole("option", { name: /Повторный созвон/ });
@@ -189,10 +206,11 @@ test("owner filters by one or several meeting types together with the guest sear
         await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
       ).toBe(true);
     },
+    viewport,
   );
-});
+}
 
-test("filter state survives refresh and reloading starts with all types", async () => {
+async function survivesRefresh(viewport: Viewport) {
   await withPage(
     meetingTypes,
     { now: ["2026-11-09T01:00:00Z"], bookings },
@@ -213,10 +231,11 @@ test("filter state survives refresh and reloading starts with all types", async 
       expect(await countText(page)).toBe("Всего: 6");
       expect(await page.locator(".mantine-MultiSelect-pill").count()).toBe(0);
     },
+    viewport,
   );
-});
+}
 
-test("calendar shows filtered matches across dates and keeps a stale selected type removable", async () => {
+async function calendarAndStaleType(viewport: Viewport) {
   await withPage(
     meetingTypes,
     { now: ["2026-11-09T01:00:00Z"], bookings },
@@ -257,10 +276,11 @@ test("calendar shows filtered matches across dates and keeps a stale selected ty
       expect(await countText(page)).toBe("На выбранный день: 1");
       expect(await page.getByText("Борис Петров").count()).toBe(1);
     },
+    viewport,
   );
-});
+}
 
-test("meeting types with the same title are filtered by identity", async () => {
+async function duplicateTitles(viewport: Viewport) {
   const duplicateTypes = [
     meetingType("intro", "Знакомство"),
     meetingType("intro-copy", "Знакомство"),
@@ -293,10 +313,11 @@ test("meeting types with the same title are filtered by identity", async () => {
       expect(await page.getByText("Борис Петров").count()).toBe(1);
       expect(await page.getByText("Анна Иванова").count()).toBe(0);
     },
+    viewport,
   );
-});
+}
 
-test("owner can still search and use the calendar without selecting a meeting type", async () => {
+async function neighborBehaviour(viewport: Viewport) {
   await withPage(
     meetingTypes,
     { now: ["2026-11-09T01:00:00Z"], bookings },
@@ -317,103 +338,111 @@ test("owner can still search and use the calendar without selecting a meeting ty
       ).toBe("true");
       expect(await countText(page)).not.toBe("Всего: 2");
     },
+    viewport,
   );
-});
+}
 
-const errorTexts = {
-  load: "Не удалось загрузить типы встреч. Попробуйте ещё раз.",
-  refresh: "Не удалось обновить типы встреч. Показан ранее загруженный список",
-};
+async function retriesFirstLoad(viewport: Viewport) {
+  await withPage(
+    meetingTypes,
+    { now: ["2026-11-09T01:00:00Z"], bookings },
+    async (page, server) => {
+      let bookingRequests = 0;
+      page.on("request", (request) => {
+        if (request.url().includes("/api/bookings")) bookingRequests += 1;
+      });
+      const blockTypes = (route: { abort: () => Promise<void> }) => route.abort();
+      await page.route("**/api/meeting-types", blockTypes);
+      await page.goto(`${server.address}/admin?view=bookings`);
+      await page.getByText("Анна Иванова").first().waitFor();
+      expect(bookingRequests).toBe(1);
 
-for (const viewport of [
-  { width: 1280, height: 900 },
-  { width: 390, height: 844 },
-]) {
-  test(`owner retries a failed first meeting type load at ${viewport.width}px`, async () => {
-    await withPage(
-      meetingTypes,
-      { now: ["2026-11-09T01:00:00Z"], bookings },
-      async (page, server) => {
-        let bookingRequests = 0;
-        page.on("request", (request) => {
-          if (request.url().includes("/api/bookings")) bookingRequests += 1;
-        });
-        const blockTypes = (route: { abort: () => Promise<void> }) => route.abort();
-        await page.route("**/api/meeting-types", blockTypes);
-        await page.goto(`${server.address}/admin?view=bookings`);
-        await page.getByText("Анна Иванова").first().waitFor();
-        expect(bookingRequests).toBe(1);
+      expect(await typeCombobox(page).isDisabled()).toBe(true);
+      expect(await page.getByText(errorTexts.load, { exact: true }).count()).toBe(1);
+      const retry = page.getByRole("button", { name: "Повторить", exact: true });
+      expect(await retry.count()).toBe(1);
 
-        expect(await typeCombobox(page).isDisabled()).toBe(true);
-        expect(await page.getByText(errorTexts.load, { exact: true }).count()).toBe(1);
-        const retry = page.getByRole("button", { name: "Повторить", exact: true });
-        expect(await retry.count()).toBe(1);
+      const search = page.getByLabel("Поиск по имени или email", { exact: true });
+      await search.fill("boris");
+      expect(await page.getByText("Борис Петров").count()).toBe(1);
+      expect(await countText(page)).toBe("Совпадений: 1");
 
-        const search = page.getByLabel("Поиск по имени или email", { exact: true });
-        await search.fill("boris");
-        expect(await page.getByText("Борис Петров").count()).toBe(1);
-        expect(await countText(page)).toBe("Совпадений: 1");
+      await page.unroute("**/api/meeting-types", blockTypes);
+      await retry.click();
+      await page.waitForFunction(
+        () => !document.querySelector('[aria-label="Тип встречи"]')?.hasAttribute("disabled"),
+      );
+      expect(await typeCombobox(page).isEnabled()).toBe(true);
+      expect(await page.getByText(errorTexts.load, { exact: true }).count()).toBe(0);
+      expect(await search.inputValue()).toBe("boris");
+      await chooseType(page, "Консультация");
+      expect(await countText(page)).toBe("Совпадений: 1");
+      expect(bookingRequests).toBe(1);
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
+      ).toBe(true);
+    },
+    viewport,
+  );
+}
 
-        await page.unroute("**/api/meeting-types", blockTypes);
-        await retry.click();
-        await page.waitForFunction(
-          () => !document.querySelector('[aria-label="Тип встречи"]')?.hasAttribute("disabled"),
-        );
-        expect(await typeCombobox(page).isEnabled()).toBe(true);
-        expect(await page.getByText(errorTexts.load, { exact: true }).count()).toBe(0);
-        expect(await search.inputValue()).toBe("boris");
-        await chooseType(page, "Консультация");
-        expect(await countText(page)).toBe("Совпадений: 1");
-        expect(bookingRequests).toBe(1);
-        expect(
-          await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
-        ).toBe(true);
-      },
-      viewport,
-    );
-  });
+async function keepsFilterOnRefreshFailure(viewport: Viewport) {
+  await withPage(
+    meetingTypes,
+    { now: ["2026-11-09T01:00:00Z"], bookings },
+    async (page, server) => {
+      let bookingRequests = 0;
+      page.on("request", (request) => {
+        if (request.url().includes("/api/bookings")) bookingRequests += 1;
+      });
+      await page.goto(`${server.address}/admin?view=bookings`);
+      await page.getByText("Анна Иванова").first().waitFor();
+      await chooseType(page, "Знакомство");
+      const search = page.getByLabel("Поиск по имени или email", { exact: true });
+      await search.fill("анна");
+      expect(await countText(page)).toBe("Совпадений: 1");
+      expect(bookingRequests).toBe(1);
 
-  test(`owner keeps the filter when a meeting type refresh fails at ${viewport.width}px`, async () => {
-    await withPage(
-      meetingTypes,
-      { now: ["2026-11-09T01:00:00Z"], bookings },
-      async (page, server) => {
-        let bookingRequests = 0;
-        page.on("request", (request) => {
-          if (request.url().includes("/api/bookings")) bookingRequests += 1;
-        });
-        await page.goto(`${server.address}/admin?view=bookings`);
-        await page.getByText("Анна Иванова").first().waitFor();
-        await chooseType(page, "Знакомство");
-        const search = page.getByLabel("Поиск по имени или email", { exact: true });
-        await search.fill("анна");
-        expect(await countText(page)).toBe("Совпадений: 1");
-        expect(bookingRequests).toBe(1);
+      const blockTypes = (route: { abort: () => Promise<void> }) => route.abort();
+      await page.route("**/api/meeting-types", blockTypes);
+      await page.getByRole("button", { name: "Обновить", exact: true }).click();
+      await page.getByText(errorTexts.refresh, { exact: true }).first().waitFor();
+      expect(bookingRequests).toBe(2);
+      expect(await typeCombobox(page).isEnabled()).toBe(true);
+      expect(await page.locator(".mantine-MultiSelect-pill").count()).toBe(1);
+      expect(await search.inputValue()).toBe("анна");
+      expect(await countText(page)).toBe("Совпадений: 1");
+      expect(await page.getByText("Анна Иванова").count()).toBe(1);
 
-        const blockTypes = (route: { abort: () => Promise<void> }) => route.abort();
-        await page.route("**/api/meeting-types", blockTypes);
-        await page.getByRole("button", { name: "Обновить", exact: true }).click();
-        await page.getByText(errorTexts.refresh, { exact: true }).first().waitFor();
-        expect(bookingRequests).toBe(2);
-        expect(await typeCombobox(page).isEnabled()).toBe(true);
-        expect(await page.locator(".mantine-MultiSelect-pill").count()).toBe(1);
-        expect(await search.inputValue()).toBe("анна");
-        expect(await countText(page)).toBe("Совпадений: 1");
-        expect(await page.getByText("Анна Иванова").count()).toBe(1);
+      await page.unroute("**/api/meeting-types", blockTypes);
+      await page.getByRole("button", { name: "Повторить", exact: true }).click();
+      await page.getByText(errorTexts.refresh, { exact: true }).waitFor({ state: "hidden" });
+      expect(await typeCombobox(page).isEnabled()).toBe(true);
+      expect(await page.locator(".mantine-MultiSelect-pill").count()).toBe(1);
+      expect(await search.inputValue()).toBe("анна");
+      expect(await countText(page)).toBe("Совпадений: 1");
+      expect(bookingRequests).toBe(2);
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
+      ).toBe(true);
+    },
+    viewport,
+  );
+}
 
-        await page.unroute("**/api/meeting-types", blockTypes);
-        await page.getByRole("button", { name: "Повторить", exact: true }).click();
-        await page.getByText(errorTexts.refresh, { exact: true }).waitFor({ state: "hidden" });
-        expect(await typeCombobox(page).isEnabled()).toBe(true);
-        expect(await page.locator(".mantine-MultiSelect-pill").count()).toBe(1);
-        expect(await search.inputValue()).toBe("анна");
-        expect(await countText(page)).toBe("Совпадений: 1");
-        expect(bookingRequests).toBe(2);
-        expect(
-          await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
-        ).toBe(true);
-      },
-      viewport,
-    );
-  });
+for (const viewport of viewports) {
+  test(`owner sees the meeting type filter at ${viewport.width}px`, () => fieldIsPresent(viewport));
+  test(`owner filters by meeting type together with the guest search at ${viewport.width}px`, () =>
+    filtersTogetherWithSearch(viewport));
+  test(`filter state survives refresh at ${viewport.width}px`, () => survivesRefresh(viewport));
+  test(`calendar shows filtered matches and keeps a stale type removable at ${viewport.width}px`, () =>
+    calendarAndStaleType(viewport));
+  test(`meeting types with the same title are filtered by identity at ${viewport.width}px`, () =>
+    duplicateTitles(viewport));
+  test(`without a type filter search and calendar behave as before at ${viewport.width}px`, () =>
+    neighborBehaviour(viewport));
+  test(`owner retries a failed first meeting type load at ${viewport.width}px`, () =>
+    retriesFirstLoad(viewport));
+  test(`owner keeps the filter when a meeting type refresh fails at ${viewport.width}px`, () =>
+    keepsFilterOnRefreshFailure(viewport));
 }

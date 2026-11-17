@@ -54,9 +54,9 @@ export function UpcomingBookings() {
   const [query, setQuery] = useState("");
   const [attempt, setAttempt] = useState(0);
   const [selectedTypeIds, setSelectedTypeIds] = useState<string[]>([]);
-  const [types, setTypes] = useState<MeetingType[]>();
-  const [typesError, setTypesError] = useState(false);
-  const [typesAttempt, setTypesAttempt] = useState(0);
+  const [meetingTypes, setMeetingTypes] = useState<MeetingType[]>();
+  const [meetingTypesError, setMeetingTypesError] = useState(false);
+  const [meetingTypesAttempt, setMeetingTypesAttempt] = useState(0);
   useEffect(() => {
     const controller = new AbortController();
     void listBookings({
@@ -83,20 +83,15 @@ export function UpcomingBookings() {
     })
       .then(({ data }) => {
         if (!controller.signal.aborted) {
-          setTypes(data.items);
-          setTypesError(false);
+          setMeetingTypes(data.items);
+          setMeetingTypesError(false);
         }
       })
       .catch(() => {
-        if (!controller.signal.aborted) setTypesError(true);
+        if (!controller.signal.aborted) setMeetingTypesError(true);
       });
     return () => controller.abort();
-  }, [typesAttempt]);
-
-  const retryTypes = () => {
-    setTypesError(false);
-    setTypesAttempt((current) => current + 1);
-  };
+  }, [meetingTypesAttempt]);
 
   const dateKey = (instant: string) =>
     new Intl.DateTimeFormat("en-CA", {
@@ -111,7 +106,7 @@ export function UpcomingBookings() {
   for (const item of allItems) {
     typeCounts.set(item.meetingTypeId, (typeCounts.get(item.meetingTypeId) ?? 0) + 1);
   }
-  const typeOptions = [...(types ?? [])]
+  const typeOptions = [...(meetingTypes ?? [])]
     .sort((a, b) => {
       const aActive = (typeCounts.get(a.id) ?? 0) > 0 || selectedTypeIds.includes(a.id);
       const bActive = (typeCounts.get(b.id) ?? 0) > 0 || selectedTypeIds.includes(b.id);
@@ -141,7 +136,7 @@ export function UpcomingBookings() {
   const needle = normalize(query);
   const searching = needle.length > 0;
   const filtering = selectedTypeIds.length > 0;
-  const hasCondition = searching || filtering;
+  const hasActiveFilter = searching || filtering;
   const matches = allItems.filter(
     (item) =>
       (!filtering || selectedTypeIds.includes(item.meetingTypeId)) &&
@@ -150,10 +145,10 @@ export function UpcomingBookings() {
         normalize(item.guestEmail).includes(needle)),
   );
   const meetings =
-    mode === "calendar" && !hasCondition
+    mode === "calendar" && !hasActiveFilter
       ? matches.filter((item) => dateKey(item.startsAt) === selectedDate)
       : matches;
-  const markedDates = hasCondition
+  const markedDates = hasActiveFilter
     ? [...new Set(matches.map((item) => dateKey(item.startsAt)))]
     : allDates;
   const counts = new Map<string, number>();
@@ -161,7 +156,7 @@ export function UpcomingBookings() {
     const day = dateKey(item.startsAt);
     counts.set(day, (counts.get(day) ?? 0) + 1);
   }
-  const countLabel = hasCondition
+  const countLabel = hasActiveFilter
     ? `Совпадений: ${matches.length}`
     : mode === "list"
       ? `Всего: ${meetings.length}`
@@ -193,7 +188,7 @@ export function UpcomingBookings() {
             setLoading(true);
             setError(false);
             setAttempt((value) => value + 1);
-            setTypesAttempt((value) => value + 1);
+            setMeetingTypesAttempt((value) => value + 1);
           }}
         >
           {error ? "Повторить" : "Обновить"}
@@ -237,7 +232,7 @@ export function UpcomingBookings() {
           onChange={setSelectedTypeIds}
           clearable
           searchable
-          disabled={typesError && !types}
+          disabled={meetingTypesError && !meetingTypes}
           styles={{ dropdown: { zIndex: 1200 } }}
           renderOption={({ option }) => (
             <Group justify="space-between" gap="xs" wrap="nowrap">
@@ -250,15 +245,19 @@ export function UpcomingBookings() {
             </Group>
           )}
         />
-        {typesError && (
-          <Alert color={types ? "yellow" : "red"} variant="light" mt="sm" role="alert">
+        {meetingTypesError && (
+          <Alert color={meetingTypes ? "yellow" : "red"} variant="light" mt="sm" role="alert">
             <Group justify="space-between" align="center" gap="xs" wrap="nowrap">
               <Text size="sm">
-                {types
+                {meetingTypes
                   ? "Не удалось обновить типы встреч. Показан ранее загруженный список"
                   : "Не удалось загрузить типы встреч. Попробуйте ещё раз."}
               </Text>
-              <Button size="xs" variant="default" onClick={retryTypes}>
+              <Button
+                size="xs"
+                variant="default"
+                onClick={() => setMeetingTypesAttempt((current) => current + 1)}
+              >
                 Повторить
               </Button>
             </Group>
@@ -343,7 +342,7 @@ export function UpcomingBookings() {
             className={mode === "calendar" ? "owner-agenda" : "owner-list"}
             aria-label={
               mode === "calendar"
-                ? hasCondition
+                ? hasActiveFilter
                   ? "Все совпадения"
                   : "Встречи на выбранную дату"
                 : "Все предстоящие встречи"
@@ -351,11 +350,11 @@ export function UpcomingBookings() {
           >
             {mode === "calendar" && (
               <Title order={3} size="h4" mb="lg">
-                {hasCondition ? "Совпадения по всем датам" : dayLabel(selectedDate)}
+                {hasActiveFilter ? "Совпадения по всем датам" : dayLabel(selectedDate)}
               </Title>
             )}
             {meetings.length === 0 ? (
-              hasCondition ? (
+              hasActiveFilter ? (
                 <Text component="output" c="dimmed" className="owner-search-empty">
                   Ничего не найдено
                 </Text>
@@ -383,7 +382,7 @@ export function UpcomingBookings() {
                   });
                   return (
                     <li key={item.id}>
-                      {(mode === "list" || hasCondition) &&
+                      {(mode === "list" || hasActiveFilter) &&
                         (index === 0 ||
                           dateKey(meetings[index - 1].startsAt) !== dateKey(item.startsAt)) && (
                           <Group justify="space-between" className="owner-date-heading">
