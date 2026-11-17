@@ -97,7 +97,7 @@ jobs:
           REVIEW_SHA: ${{ steps.budget.outputs.sha }}
           REVIEW_MODEL: ${{ inputs.model || 'opencode/mimo-v2.6-flash-free' }}
           OPENCODE_CONFIG_CONTENT: >-
-            {"model":"${{ inputs.model || 'opencode/mimo-v2.6-flash-free' }}","small_model":"${{ inputs.model || 'opencode/mimo-v2.6-flash-free' }}","agent":{"plan":{"steps":2},"title":{"disable":true}}}
+            {"model":"${{ inputs.model || 'opencode/mimo-v2.6-flash-free' }}","small_model":"${{ inputs.model || 'opencode/mimo-v2.6-flash-free' }}","agent":{"plan":{"steps":2},"title":{"disable":true}},"provider":{"opencode":{"models":{"mimo-v2.6-flash-free":{"options":{"thinking":{"type":"disabled"}}}}}}}
           OPENCODE_PERMISSION: '{"*":"deny","bash":"ask","read":"ask"}'
         run: timeout -k 10s 450s mise exec opencode@1.19.5 -- node scripts/review-runner.mjs
 

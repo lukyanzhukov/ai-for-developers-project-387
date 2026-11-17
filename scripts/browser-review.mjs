@@ -156,7 +156,17 @@ try {
       };
     });
     await page.locator("label").filter({ hasText: "Календарь" }).click();
-    await page.getByRole("button", { name: "2026-11-11", exact: true }).click();
+    await step(
+      "keyboard-list-retains-date",
+      { selected: "true", count: 1, boris: true },
+      async () => ({
+        selected: await page
+          .getByRole("button", { name: "2026-11-11", exact: true })
+          .getAttribute("aria-pressed"),
+        count: await cards().count(),
+        boris: (await cards().allTextContents()).some((text) => text.includes("Борис")),
+      }),
+    );
     await step(
       "keyboard-calendar-clear",
       { query: "", focused: true, count: 1, selected: "true", boris: true },
