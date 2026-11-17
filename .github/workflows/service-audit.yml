@@ -33,7 +33,6 @@ jobs:
       contents: read
       issues: read
     env:
-      APP_URL: http://127.0.0.1:4173/
       SERVICE_AUDIT_EXERCISE: ${{ inputs.exercise || false }}
     steps:
       - name: Checkout trusted main event SHA
@@ -46,6 +45,10 @@ jobs:
         with:
           version: 2026.10.19
           install_args: node@24.22.2 pnpm@12.18.0 opencode@1.19.5
+      - name: Use the server port configured in mise
+        run: |
+          server_port="$(mise exec -- node -p 'process.env.PORT')"
+          printf 'APP_URL=http://127.0.0.1:%s/\n' "$server_port" >> "$GITHUB_ENV"
       - name: Build Call Calendar at the audit SHA
         if: inputs.exercise != true
         timeout-minutes: 5
@@ -57,8 +60,7 @@ jobs:
         timeout-minutes: 4
         run: |
           mkdir -p "$RUNNER_TEMP/audit"
-          PORT="$(node -p 'new URL(process.env.APP_URL).port')" HOST=127.0.0.1 NODE_ENV=production \
-            node dist/server/main.js > "$RUNNER_TEMP/audit/server.log" 2>&1 &
+          NODE_ENV=production mise exec -- node dist/server/main.js > "$RUNNER_TEMP/audit/server.log" 2>&1 &
           server_pid=$!
           trap 'kill "$server_pid" 2>/dev/null || true; wait "$server_pid" 2>/dev/null || true' EXIT
           curl --fail --silent --show-error --retry 10 --retry-connrefused \
