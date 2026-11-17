@@ -9,7 +9,8 @@ import { pathToFileURL } from "node:url";
 const root = process.cwd();
 const output = resolve(process.env.EVIDENCE_DIR || "artifacts/browser");
 await mkdir(output, { recursive: true });
-const sha = execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim();
+const readHead = () => execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim();
+const sha = readHead();
 const profile = process.env.BROWSER_PROFILE || "search";
 const profiles = ["search", "keyboard-search", "type-filter"];
 const issue = (number) =>
@@ -60,8 +61,9 @@ async function step(name, expected, inspect) {
 
 try {
   assert.ok(profiles.includes(profile), "Unknown browser profile");
+  report.verifiedSha = readHead();
   assert.match(report.verifiedSha, /^[a-f0-9]{40}$/);
-  assert.equal(report.verifiedSha, sha);
+  assert.equal(report.verifiedSha, sha, "HEAD changed during review");
   assert.equal(report.sha, report.expectedSha, "Checkout differs from the requested PR head");
   execFileSync("git", ["diff", "--quiet", "HEAD", "--", "web", "server", "api", "generated"]);
   // The application and dependencies come from the checked head. This checker can
