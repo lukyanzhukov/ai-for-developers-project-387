@@ -354,6 +354,31 @@ async function searchHintUnchanged(viewport: Viewport) {
         .filter({ hasText: "Часть имени или email" });
       expect(await hint.count()).toBe(1);
       expect((await hint.textContent())?.trim()).toBe("Часть имени или email, без учёта регистра");
+
+      const order = await page.evaluate(() => {
+        const search = document.querySelector('[aria-label="Поиск по имени или email"]');
+        const hintElement = [...document.querySelectorAll(".owner-search-field p")].find(
+          (element) => element.textContent?.includes("Часть имени или email"),
+        );
+        const type = document.querySelector('[aria-label="Тип встречи"]');
+        const follows = (first: Element | null, second: Element | null) =>
+          !!first &&
+          !!second &&
+          !!(first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING);
+        const top = (element: Element | null) =>
+          element ? element.getBoundingClientRect().top : Number.NaN;
+        return {
+          searchBeforeHint: follows(search, hintElement ?? null),
+          hintBeforeType: follows(hintElement ?? null, type),
+          searchTop: top(search),
+          hintTop: top(hintElement ?? null),
+          typeTop: top(type),
+        };
+      });
+      expect(order.searchBeforeHint).toBe(true);
+      expect(order.hintBeforeType).toBe(true);
+      expect(order.searchTop).toBeLessThan(order.hintTop);
+      expect(order.hintTop).toBeLessThan(order.typeTop);
     },
     viewport,
   );

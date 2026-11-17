@@ -223,6 +223,9 @@ export function UpcomingBookings() {
           }
           rightSectionPointerEvents="all"
         />
+        <Text size="xs" c="dimmed" mt="sm">
+          Часть имени или email, без учёта регистра
+        </Text>
         <MultiSelect
           label="Тип встречи"
           placeholder="Все типы"
@@ -263,10 +266,7 @@ export function UpcomingBookings() {
             </Group>
           </Alert>
         )}
-        <Group justify="space-between" mt="sm" gap="xs">
-          <Text size="xs" c="dimmed">
-            Часть имени или email, без учёта регистра
-          </Text>
+        <Group justify="flex-end" mt="sm" gap="xs">
           {data && (
             <Text size="xs" fw={600} className="owner-search-count">
               {countLabel}
