@@ -85,7 +85,12 @@ export function App({ pathname }: { pathname: string }) {
           <>
             <section className="home-hero">
               <Stack gap={24} align="flex-start" className="home-copy">
-                <Badge variant="light" color="orange" radius="sm">
+                <Badge
+                  variant="light"
+                  color="orange"
+                  radius="sm"
+                  classNames={{ label: "hero-badge-label" }}
+                >
                   Без регистрации
                 </Badge>
                 <Title order={1} className="hero-title">
