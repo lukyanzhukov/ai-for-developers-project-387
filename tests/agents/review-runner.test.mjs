@@ -3,7 +3,14 @@ import assert from "node:assert/strict";
 import { mkdtemp, writeFile, chmod, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { runReview } from "../../scripts/review-runner.mjs";
+import { runReview, reviewModel } from "../../scripts/review-runner.mjs";
+
+test("review only selects explicitly allowed free models", () => {
+  assert.equal(reviewModel(), "opencode/mimo-v2.6-flash-free");
+  for (const model of ["opencode/big-pickle", "opencode/mimo-v2.6-flash-free"])
+    assert.equal(reviewModel(model), model);
+  assert.throws(() => reviewModel("opencode/paid-or-unknown"), /Unsupported review model/);
+});
 
 test(
   "fatal provider stderr stops a hanging reviewer and saves redacted diagnostics",
