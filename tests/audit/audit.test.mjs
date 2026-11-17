@@ -1173,8 +1173,10 @@ test("service exercise analyzes the fixture and publishes one issue across two r
       agent,
       `#!/bin/sh
 prompt=$(cat)
-printf '%s' "$prompt" | grep -q '"exercise":true' || exit 2
+printf '%s' "$prompt" | grep -Fxq 'Service audit instructions from the workflow' || exit 2
 printf '%s' "$prompt" | grep -q 'Real issue for the same audit ID' && exit 3
+printf '%s' "$prompt" | grep -q '^Snapshot: .*"exercise":true' || exit 4
+printf '%s' "$prompt" | grep -q '^Issue inventory: ' || exit 5
 printf '%s\\n' '${JSON.stringify(agentEvent)}'
 `,
       { mode: 0o755 },
@@ -1184,6 +1186,7 @@ printf '%s\\n' '${JSON.stringify(agentEvent)}'
       GITHUB_API_URL: `http://127.0.0.1:${server.address().port}`,
       APP_URL: "http://127.0.0.1:4173/",
       SERVICE_AUDIT_EXERCISE: "true",
+      PROMPT: "Service audit instructions from the workflow",
       OPENCODE_BIN: agent,
       GH_TOKEN: "fake",
     };
