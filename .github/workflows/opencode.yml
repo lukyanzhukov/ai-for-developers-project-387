@@ -1,4 +1,6 @@
 name: OpenCode
+run-name: >-
+  OpenCode ${{ (github.event.issue.pull_request || github.event_name == 'pull_request_review_comment') && 'PR' || 'issue' }} #${{ github.event.issue.number || github.event.pull_request.number }}
 
 on:
   issue_comment:
@@ -6,58 +8,100 @@ on:
   pull_request_review_comment:
     types: [created]
 
+# Only repeats of the same comment share this outer queue. The eligible command
+# job below serializes by PR; ignored bot events never displace a pending command.
 concurrency:
-  group: opencode-${{ github.workflow }}-${{ github.event.issue.number || github.event.pull_request.number }}
+  group: opencode-event-${{ github.event.comment.id || github.run_id }}
   cancel-in-progress: false
 
 jobs:
-  opencode:
-    if: |
+  route:
+    if: >-
       github.event.comment.user.type == 'User' &&
       github.event.comment.user.login == github.repository_owner &&
-      (github.event_name != 'pull_request_review_comment' ||
-       github.event.pull_request.head.repo.full_name == github.repository) &&
-      (
-        contains(github.event.comment.body, '/oc') ||
-        contains(github.event.comment.body, '/opencode')
-      )
+      (contains(github.event.comment.body, '/oc') || contains(github.event.comment.body, '/opencode'))
     runs-on: ubuntu-24.04
-    timeout-minutes: 40
+    timeout-minutes: 2
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      allowed: ${{ steps.target.outputs.allowed }}
+      number: ${{ steps.target.outputs.number || github.event.issue.number || github.event.pull_request.number }}
+      isPR: ${{ steps.target.outputs.isPR || ((github.event.issue.pull_request || github.event_name == 'pull_request_review_comment') && 'true' || 'false') }}
+      sha: ${{ steps.target.outputs.sha }}
+    steps:
+      - name: Checkout trusted policy
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      - name: Authorize command target
+        id: target
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
+        with:
+          script: |
+            const { commandTarget } = require('./scripts/pr-run-budget.cjs');
+            const result = await commandTarget({ github, context });
+            for (const [key, value] of Object.entries(result)) core.setOutput(key, String(value));
+
+  opencode:
+    needs: route
+    if: needs.route.outputs.allowed == 'true'
+    concurrency:
+      group: opencode-command-${{ needs.route.outputs.number }}
+      cancel-in-progress: false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 38
     permissions:
       contents: read
       id-token: write
       pull-requests: read
       issues: write
+      actions: read
+    outputs:
+      allowed: ${{ steps.budget.outputs.allowed }}
+      number: ${{ steps.budget.outputs.number }}
+      sha: ${{ steps.budget.outputs.sha }}
+      isPR: ${{ steps.budget.outputs.isPR }}
+      used: ${{ steps.budget.outputs.used }}
+      limit: ${{ steps.budget.outputs.limit }}
+      budgetOutcome: ${{ steps.budget.outcome }}
+      installOutcome: ${{ steps.install.outcome }}
+      modelOutcome: ${{ steps.model.outcome }}
+      reason: ${{ steps.budget.outputs.reason || steps.model.outputs.reason }}
+      modelInvoked: ${{ steps.model.outputs.modelInvoked }}
     steps:
-      - name: Checkout repository
+      - name: Checkout trusted policy
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          fetch-depth: 1
+          ref: ${{ github.event.repository.default_branch }}
           persist-credentials: false
-
-      - name: Authorize command target
-        id: target
-        timeout-minutes: 1
+      - name: Check command budget
+        timeout-minutes: 2
+        id: budget
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
         with:
-          result-encoding: string
           script: |
-            const authorizeCommand = require('./scripts/opencode-command-policy.cjs');
-            const allowed = await authorizeCommand({ github, context });
-            if (!allowed) core.notice('Command ignored: untrusted author, unsupported command or fork PR.');
-            return allowed;
-
+            const { commandBudget } = require('./scripts/pr-run-budget.cjs');
+            const result = await commandBudget({ github, context });
+            for (const [key, value] of Object.entries(result)) core.setOutput(key, String(value));
+            if (!result.allowed) core.setFailed(result.reason || 'infra');
+      - name: Admit PR command
+        if: steps.budget.outputs.allowed == 'true' && steps.budget.outputs.isPR == 'true'
+        run: echo "PR command admitted; this completed step is the immutable budget record."
       - name: Install pinned OpenCode
-        if: steps.target.outputs.result == 'true'
-        timeout-minutes: 1
+        id: install
+        if: steps.budget.outputs.allowed == 'true'
+        timeout-minutes: 2
         uses: jdx/mise-action@5228313ee0372e111a38da051671ca30fc5a96db # v3
         with:
           version: 2026.10.19
           working_directory: ${{ runner.temp }}
-          install_args: opencode@1.19.5
-
+          install_args: node@24.22.2 opencode@1.19.5
       - name: Run OpenCode
-        if: steps.target.outputs.result == 'true'
+        id: model
+        if: steps.budget.outputs.allowed == 'true'
         timeout-minutes: 32
         env:
           MODEL: opencode/big-pickle
@@ -67,18 +111,59 @@ jobs:
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
           OPENCODE_PERMISSION: '{"external_directory":{"*":"deny","${{ runner.temp }}/_github_workflow/*":"allow"},"doom_loop":"deny","question":"deny","plan_enter":"deny","plan_exit":"deny","read":{"*.env":"deny","*.env.*":"deny","*.env.example":"allow"}}'
           OPENCODE_CONFIG_CONTENT: '{"model":"opencode/big-pickle","small_model":"opencode/big-pickle","agent":{"title":{"disable":true}}}'
-        run: timeout -k 10s 1800s mise exec opencode@1.19.5 -- opencode github run < /dev/null
-
-      - name: Preserve design work
-        if: always() && steps.target.outputs.result == 'true'
+        run: mise exec opencode@1.19.5 -- node scripts/command-runner.mjs
+      - name: Preserve agent work
+        if: always() && steps.budget.outputs.allowed == 'true'
         timeout-minutes: 2
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: opencode-work-${{ github.event.issue.number || github.event.pull_request.number }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: opencode-work-${{ needs.route.outputs.number }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
             web/
             docs/design/
             package.json
             capture-search-mockup.mjs
+            ${{ runner.temp }}/command-result.json
           if-no-files-found: ignore
+          retention-days: 14
+
+  report:
+    needs: [route, opencode]
+    if: always() && (needs.route.outputs.allowed == 'true' || needs.route.result == 'failure')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    permissions:
+      actions: read
+      contents: read
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Checkout trusted reporter
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      - name: Publish outcome without model
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
+        env:
+          COMMAND: ${{ toJSON(needs.opencode.outputs) }}
+          TARGET: ${{ toJSON(needs.route.outputs) }}
+          JOB_RESULT: ${{ needs.opencode.result }}
+        with:
+          script: |
+            const { publishOutcome } = require('./scripts/agent-outcome.cjs');
+            const target = JSON.parse(process.env.TARGET);
+            const result = JSON.parse(process.env.COMMAND);
+            await publishOutcome({ github, context, summary: core.summary, directory: process.env.RUNNER_TEMP, input: {
+              ...target, ...result, number: result.number || target.number, sha: result.sha || target.sha,
+              isPR: result.isPR || target.isPR, jobResult: process.env.JOB_RESULT, lane: 'command',
+              runUrl: context.serverUrl + '/' + context.repo.owner + '/' + context.repo.repo + '/actions/runs/' + context.runId + '/attempts/' + process.env.GITHUB_RUN_ATTEMPT
+            } });
+      - name: Save outcome
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: command-outcome-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/agent-outcome.*
+          if-no-files-found: error
           retention-days: 14

@@ -62,7 +62,7 @@ test(
         binary,
         `#!/usr/bin/env node
 const fs = require('node:fs');
-fs.writeFileSync(${JSON.stringify(join(root, "invocation.json"))}, JSON.stringify({ args: process.argv.slice(2), permissions: JSON.parse(process.env.OPENCODE_PERMISSION) }));
+fs.writeFileSync(${JSON.stringify(join(root, "invocation.json"))}, JSON.stringify({ args: process.argv.slice(2), permissions: JSON.parse(process.env.OPENCODE_PERMISSION), config:JSON.parse(process.env.OPENCODE_CONFIG_CONTENT) }));
 process.stdin.resume();
 process.stdin.on('end', () => {
   console.log(JSON.stringify({ type:'text', part:{ id:'p', messageID:'m', text:'{"summary":"OK","findings":[]}' } }));
@@ -76,6 +76,9 @@ process.stdin.on('end', () => {
       const call = JSON.parse(await readFile(join(root, "invocation.json"), "utf8"));
       for (const flag of ["--no-auto", "--no-yolo", "--no-dangerously-skip-permissions"])
         assert.ok(call.args.includes(flag));
+      assert.equal(call.args[call.args.indexOf("--agent") + 1], "review");
+      assert.equal(call.config.agent.review.steps, 1);
+      assert.equal(call.config.agent.review.mode, "primary");
       assert.deepEqual(call.permissions, { "*": "deny", bash: "ask", read: "ask" });
     } finally {
       await rm(root, { recursive: true, force: true });

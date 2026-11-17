@@ -1,4 +1,6 @@
 name: OpenCode PR Review
+run-name: >-
+  OpenCode review PR #${{ github.event.pull_request.number || inputs.pr_number }}
 
 on:
   pull_request:
@@ -31,6 +33,17 @@ jobs:
         github.event.pull_request.user.login == 'opencode-agent[bot]'))
     runs-on: ubuntu-24.04
     timeout-minutes: 12
+    outputs:
+      allowed: ${{ steps.budget.outputs.allowed }}
+      number: ${{ steps.budget.outputs.number }}
+      sha: ${{ steps.budget.outputs.sha }}
+      used: ${{ steps.budget.outputs.used }}
+      limit: ${{ steps.budget.outputs.limit }}
+      budgetOutcome: ${{ steps.budget.outcome }}
+      installOutcome: ${{ steps.install.outcome }}
+      modelOutcome: ${{ steps.model.outcome }}
+      reason: ${{ steps.budget.outputs.reason || steps.model.outputs.reason }}
+      modelInvoked: ${{ steps.model.outputs.modelInvoked }}
     permissions:
       contents: read
       issues: write
@@ -46,6 +59,7 @@ jobs:
           fetch-depth: 0
 
       - name: Reserve review attempt
+        timeout-minutes: 2
         id: budget
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
         with:
@@ -82,12 +96,14 @@ jobs:
             fs.writeFileSync(`${process.env.RUNNER_TEMP}/review-snapshot.md`, snapshot);
 
       - name: Install toolchain
+        id: install
         if: steps.budget.outputs.allowed == 'true'
         uses: jdx/mise-action@5228313ee0372e111a38da051671ca30fc5a96db # v3
         with:
           version: 2026.10.19
 
       - name: Review with OpenCode CLI
+        id: model
         if: steps.budget.outputs.allowed == 'true'
         timeout-minutes: 8
         env:
@@ -97,7 +113,7 @@ jobs:
           REVIEW_SHA: ${{ steps.budget.outputs.sha }}
           REVIEW_MODEL: ${{ inputs.model || 'opencode/mimo-v2.6-flash-free' }}
           OPENCODE_CONFIG_CONTENT: >-
-            {"model":"${{ inputs.model || 'opencode/mimo-v2.6-flash-free' }}","small_model":"${{ inputs.model || 'opencode/mimo-v2.6-flash-free' }}","agent":{"plan":{"steps":2},"title":{"disable":true}},"provider":{"opencode":{"models":{"mimo-v2.6-flash-free":{"options":{"thinking":{"type":"disabled"}}}}}}}
+            {"model":"${{ inputs.model || 'opencode/mimo-v2.6-flash-free' }}","small_model":"${{ inputs.model || 'opencode/mimo-v2.6-flash-free' }}","agent":{"title":{"disable":true}},"provider":{"opencode":{"models":{"mimo-v2.6-flash-free":{"options":{"thinking":{"type":"disabled"}}}}}}}
           OPENCODE_PERMISSION: '{"*":"deny","bash":"ask","read":"ask"}'
         run: timeout -k 10s 450s mise exec opencode@1.19.5 -- node scripts/review-runner.mjs
 
@@ -128,4 +144,44 @@ jobs:
             ${{ runner.temp }}/opencode-review.stderr
             ${{ runner.temp }}/review-snapshot.md
           if-no-files-found: ignore
+          retention-days: 14
+
+  report:
+    needs: review
+    if: always() && needs.review.result != 'skipped'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    permissions:
+      actions: read
+      contents: read
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Checkout reporter
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - name: Publish outcome without model
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
+        env:
+          REVIEW: ${{ toJSON(needs.review.outputs) }}
+          JOB_RESULT: ${{ needs.review.result }}
+          PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
+        with:
+          script: |
+            const { publishOutcome } = require('./scripts/agent-outcome.cjs');
+            const result = JSON.parse(process.env.REVIEW);
+            await publishOutcome({ github, context, summary: core.summary, directory: process.env.RUNNER_TEMP, input: {
+              ...result, number: result.number || process.env.PR_NUMBER, isPR: 'true',
+              jobResult: process.env.JOB_RESULT, lane: 'review',
+              runUrl: context.serverUrl + '/' + context.repo.owner + '/' + context.repo.repo + '/actions/runs/' + context.runId + '/attempts/' + process.env.GITHUB_RUN_ATTEMPT
+            } });
+      - name: Save outcome
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: review-outcome-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/agent-outcome.*
+          if-no-files-found: error
           retention-days: 14

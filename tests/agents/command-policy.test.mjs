@@ -36,92 +36,29 @@ function fixture(eventName = "issue_comment", head = repository, base = reposito
   return { github, context, calls };
 }
 
-test("workflow rejects fork review events before checkout", { timeout: 1000 }, () => {
+test("workflow only enters the serialized model job after routing and admission", () => {
   const workflow = readFileSync(
     new URL("../../.github/workflows/opencode.yml", import.meta.url),
     "utf8",
   );
-  const match = workflow.match(/  opencode:\n    if: \|\n([\s\S]*?)    runs-on:/);
-  assert.ok(match, "The job must have an explicit authorization condition before steps run");
-  // The actual job condition uses the common JS/GitHub expression subset.
-  // Evaluate it with event fixtures instead of checking for a particular string.
-  const allowed = (github) =>
-    runInNewContext(
-      `(${match[1]})`,
-      {
-        github,
-        contains: (body, mention) => body.toLowerCase().includes(mention.toLowerCase()),
-      },
-      { timeout: 100 },
-    );
-  for (const [head, expected] of [
-    [repository, true],
-    ["outsider/fork", false],
-  ]) {
-    const { context } = fixture("pull_request_review_comment");
-    context.payload.pull_request.head = { repo: { full_name: head } };
-    const github = {
-      event: context.payload,
-      event_name: context.eventName,
-      repository_owner: context.repo.owner,
-      repository,
-    };
-    assert.equal(allowed(github), expected, `Review event from ${head}`);
-    github.event.comment.user.type = "Bot";
-    assert.equal(allowed(github), false);
-  }
-  const { context } = fixture();
-  assert.equal(
-    allowed({
-      event: context.payload,
-      event_name: context.eventName,
-      repository_owner: context.repo.owner,
-      repository,
-    }),
-    true,
-  );
-});
-
-test(
-  "workflow gates installation and the model secret on target authorization",
-  { timeout: 1000 },
-  async () => {
-    const workflow = readFileSync(
-      new URL("../../.github/workflows/opencode.yml", import.meta.url),
-      "utf8",
-    );
-    for (const name of ["Install pinned OpenCode", "Run OpenCode"]) {
-      const block = workflow.split(`      - name: ${name}\n`)[1]?.split("      - name:")[0];
-      assert.ok(block, `${name} step must exist`);
-      const condition = block.match(/^        if: (.+)$/m)?.[1];
-      assert.ok(condition, `${name} must require successful target authorization`);
-      for (const head of [repository, "outsider/fork"]) {
-        const input = fixture("issue_comment", head);
-        input.context.payload.issue.pull_request = {};
-        const result = String(await authorizeCommand(input));
-        const allowed = runInNewContext(
-          `(${condition})`,
-          {
-            steps: { target: { outputs: { result } } },
-          },
-          { timeout: 100 },
-        );
-        assert.equal(allowed, head === repository, `${name} for ${head}`);
-      }
-      // A failed authorization step produces no success output.
+  const job = workflow.split("  opencode:\n")[1].split("  report:\n")[0];
+  assert.match(job, /needs: route/);
+  assert.match(job, /if: needs.route.outputs.allowed == 'true'/);
+  assert.match(job, /group: opencode-command-/);
+  for (const name of ["Install pinned OpenCode", "Run OpenCode"]) {
+    const block = job.split("      - name: " + name + "\n")[1].split("      - name:")[0];
+    const condition = block.match(/^        if: (.+)$/m)[1];
+    for (const allowed of ["true", "false", undefined])
       assert.equal(
-        runInNewContext(
-          `(${condition})`,
-          {
-            steps: { target: { outputs: {} } },
-          },
-          { timeout: 100 },
-        ),
-        false,
+        runInNewContext("(" + condition + ")", { steps: { budget: { outputs: { allowed } } } }),
+        allowed === "true",
       );
-    }
-  },
-);
+  }
+  assert.ok(job.indexOf("Admit PR command") < job.indexOf("secrets.OPENCODE_API_KEY"));
+  const report = workflow.split("  report:\n")[1];
+  assert.match(report, /if: always\(\)/);
+  assert.ok(!report.includes("OPENCODE_API_KEY"));
+});
 
 test("owner commands in an issue need no PR API call", { timeout: 1000 }, async () => {
   for (const command of [
