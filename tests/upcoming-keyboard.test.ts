@@ -81,8 +81,11 @@ async function openBookings() {
     await list.getByText("Анна Смирнова · 30 мин", { exact: true }).waitFor();
     return { server, browser, page, list };
   } catch (error) {
-    if (browser) await browser.close();
-    await server.close();
+    try {
+      await browser?.close();
+    } finally {
+      await server.close();
+    }
     throw error;
   }
 }
