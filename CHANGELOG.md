@@ -1,5 +1,43 @@
 # Changelog
 
+## [1.3.0](https://github.com/lukyanzhukov/ai-for-developers-project-387/compare/v1.2.1...v1.3.0) (2026-11-17)
+
+### Features
+
+- **ci:** ограничить PR-команды по истории Actions ([#96](https://github.com/lukyanzhukov/ai-for-developers-project-387/issues/96)) ([7219be1](https://github.com/lukyanzhukov/ai-for-developers-project-387/commit/7219be11ccd8924f03972718664ea1b90763fb0e))
+- **ci:** ограничить команды PR и защитить main ([#96](https://github.com/lukyanzhukov/ai-for-developers-project-387/issues/96)) ([64b2b4d](https://github.com/lukyanzhukov/ai-for-developers-project-387/commit/64b2b4d2bc9981a790048888d0b23148e384d737))
+- **ci:** ограничить ревью и сохранять результаты проверок ([#88](https://github.com/lukyanzhukov/ai-for-developers-project-387/issues/88)) ([cd00faf](https://github.com/lukyanzhukov/ai-for-developers-project-387/commit/cd00faf6e38e86b02d278b97b77c9d99780d15ed))
+- **ci:** ограничить ревью и сохранять результаты проверок ([#88](https://github.com/lukyanzhukov/ai-for-developers-project-387/issues/88)) ([c3f1040](https://github.com/lukyanzhukov/ai-for-developers-project-387/commit/c3f104073b284e642f3d793df10c44fddd9a17f2))
+- очистка поиска встреч по Escape ([#92](https://github.com/lukyanzhukov/ai-for-developers-project-387/issues/92)) ([1a9f502](https://github.com/lukyanzhukov/ai-for-developers-project-387/commit/1a9f502f702e5616e3f673f565312b96a0573346))
+- очистка поиска встреч по Escape ([#92](https://github.com/lukyanzhukov/ai-for-developers-project-387/issues/92)) ([73e91e2](https://github.com/lukyanzhukov/ai-for-developers-project-387/commit/73e91e20800ee616d65384a65dc2db18118ccb55))
+- поиск предстоящих встреч по гостю ([#85](https://github.com/lukyanzhukov/ai-for-developers-project-387/issues/85), [#86](https://github.com/lukyanzhukov/ai-for-developers-project-387/issues/86)) ([c230e87](https://github.com/lukyanzhukov/ai-for-developers-project-387/commit/c230e87be704bb7741a1dcb2f82d90adc089603e))
+- фильтр предстоящих встреч по типу ([#100](https://github.com/lukyanzhukov/ai-for-developers-project-387/issues/100)) ([c37769a](https://github.com/lukyanzhukov/ai-for-developers-project-387/commit/c37769ac8d54e23299fec7e7ac82402faa41eff7))
+- фильтр предстоящих встреч по типу ([#101](https://github.com/lukyanzhukov/ai-for-developers-project-387/issues/101)) ([fd4d05a](https://github.com/lukyanzhukov/ai-for-developers-project-387/commit/fd4d05a70482c1d394e0f63d885cea76e7e11634))
+
+### Bug Fixes
+
+- **ci:** complete agent workflow requirements ([#73](https://github.com/lukyanzhukov/ai-for-developers-project-387/issues/73)) ([84bfc2c](https://github.com/lukyanzhukov/ai-for-developers-project-387/commit/84bfc2c5b699ba99ff422253fbcb87b1595a0f04))
+- **ci:** complete agent workflow requirements ([#73](https://github.com/lukyanzhukov/ai-for-developers-project-387/issues/73)) ([f07408b](https://github.com/lukyanzhukov/ai-for-developers-project-387/commit/f07408b4926c55ea604e12a08241b1aed41d048e))
+- **ci:** prevent interactive agent hangs ([#73](https://github.com/lukyanzhukov/ai-for-developers-project-387/issues/73)) ([6f32cd1](https://github.com/lukyanzhukov/ai-for-developers-project-387/commit/6f32cd1062de6830adcd4fc76f93487b0c5568ab))
+- **ci:** prevent interactive agent hangs ([#73](https://github.com/lukyanzhukov/ai-for-developers-project-387/issues/73)) ([7e4c8a0](https://github.com/lukyanzhukov/ai-for-developers-project-387/commit/7e4c8a0aca1ec7a0220d19efae63574cec5e84ba))
+- **ci:** выбирать бесплатную модель ревью явно ([#89](https://github.com/lukyanzhukov/ai-for-developers-project-387/issues/89)) ([da562e3](https://github.com/lukyanzhukov/ai-for-developers-project-387/commit/da562e3b00094bdc009a7765027383642e13f184))
+- **ci:** дать скиллам штатную авторизацию gh ([#78](https://github.com/lukyanzhukov/ai-for-developers-project-387/issues/78)) ([cf35190](https://github.com/lukyanzhukov/ai-for-developers-project-387/commit/cf35190b6ac611f935c329a87e00f8201b72f227))
+- **ci:** обращения через triage, спецификацию и тикеты ([#78](https://github.com/lukyanzhukov/ai-for-developers-project-387/issues/78)) ([13d4e4e](https://github.com/lukyanzhukov/ai-for-developers-project-387/commit/13d4e4ec622f68c74c24173b67dd264e05bf8194))
+- **ci:** останавливать ревью при ошибке провайдера ([#88](https://github.com/lukyanzhukov/ai-for-developers-project-387/issues/88)) ([6d27e28](https://github.com/lukyanzhukov/ai-for-developers-project-387/commit/6d27e2805a74287d2c96c3f58e6c9bb68a017aa2))
+- **ci:** проверять завершённый ответ ревьюера ([#88](https://github.com/lukyanzhukov/ai-for-developers-project-387/issues/88)) ([e92ccfb](https://github.com/lukyanzhukov/ai-for-developers-project-387/commit/e92ccfb1999a7c763cc1172b66a218f833e24fe2))
+- **ci:** проверять сохранение даты после Escape в списке ([#89](https://github.com/lukyanzhukov/ai-for-developers-project-387/issues/89)) ([5c77d21](https://github.com/lukyanzhukov/ai-for-developers-project-387/commit/5c77d21c6dfef166d2b1ba748b09c034c3615f87))
+- **ci:** проверять фактический HEAD в браузерном checker ([#95](https://github.com/lukyanzhukov/ai-for-developers-project-387/issues/95)) ([07173e6](https://github.com/lukyanzhukov/ai-for-developers-project-387/commit/07173e6add3dc70e8408984fdd740f005929590a))
+- **ci:** провести обращения через triage и скиллы ([#78](https://github.com/lukyanzhukov/ai-for-developers-project-387/issues/78)) ([2ddb9fb](https://github.com/lukyanzhukov/ai-for-developers-project-387/commit/2ddb9fbf1fb3d2842d301c1d11f002017b51d0d9))
+- **ci:** публиковать причины сбоев и ограничить роль ревьюера ([#96](https://github.com/lukyanzhukov/ai-for-developers-project-387/issues/96)) ([abda503](https://github.com/lukyanzhukov/ai-for-developers-project-387/commit/abda5036ee6a7d36665b9bc4a2019cadfa6d6e59))
+- **ci:** сохранить результат долгой проработки ([#78](https://github.com/lukyanzhukov/ai-for-developers-project-387/issues/78)) ([ecdefc8](https://github.com/lukyanzhukov/ai-for-developers-project-387/commit/ecdefc8c7278fc3ec1ba338924904e9f541593d1))
+- **ci:** сохранять макеты и дать агенту время ([#78](https://github.com/lukyanzhukov/ai-for-developers-project-387/issues/78)) ([6330ec9](https://github.com/lukyanzhukov/ai-for-developers-project-387/commit/6330ec94442827c0fe98732547dba985f7bf4aea))
+- **ci:** убрать правку workflow из профиля фильтра ([#95](https://github.com/lukyanzhukov/ai-for-developers-project-387/issues/95)) ([c0b1a1f](https://github.com/lukyanzhukov/ai-for-developers-project-387/commit/c0b1a1f57c033af5e8ba222168c20795dd521b7b))
+- **ci:** увеличить время проработки OpenCode ([#78](https://github.com/lukyanzhukov/ai-for-developers-project-387/issues/78)) ([ae20be4](https://github.com/lukyanzhukov/ai-for-developers-project-387/commit/ae20be48d3c065c941bc487988a0e490720f1c3c))
+- **ci:** увеличить время проработки OpenCode ([#78](https://github.com/lukyanzhukov/ai-for-developers-project-387/issues/78)) ([25dd411](https://github.com/lukyanzhukov/ai-for-developers-project-387/commit/25dd41131ba02cd875e5d582d569d3bce626745d))
+- вернуть исходную подпись поиска фильтра типов ([#100](https://github.com/lukyanzhukov/ai-for-developers-project-387/issues/100)) ([f77678e](https://github.com/lukyanzhukov/ai-for-developers-project-387/commit/f77678ea2b91a1f761c6eb1963d0bce37a4d2a54))
+- перенести подпись поиска перед фильтром типов ([#100](https://github.com/lukyanzhukov/ai-for-developers-project-387/issues/100)) ([50f50ed](https://github.com/lukyanzhukov/ai-for-developers-project-387/commit/50f50ed6d1c7acda92ed3f19a278bc4a16176abe))
+- устойчивость фильтра к ошибкам справочника типов ([#102](https://github.com/lukyanzhukov/ai-for-developers-project-387/issues/102)) ([576a3d0](https://github.com/lukyanzhukov/ai-for-developers-project-387/commit/576a3d03b39dd93f95cc0bb98d53fe60d4fb8ad8))
+
 ## [1.2.1](https://github.com/lukyanzhukov/ai-for-developers-project-386/compare/v1.2.0...v1.2.1) (2026-11-14)
 
 ### Bug Fixes
