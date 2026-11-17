@@ -7,6 +7,7 @@
     "generate": "node scripts/generate.mjs",
     "dev:server": "node --watch server/main.ts",
     "dev:web": "vite",
+    "mockup:type-filter": "node scripts/capture-meeting-type-filter-mockup.mjs",
     "build": "tsc -p tsconfig.server.json && vite build",
     "start": "node dist/server/main.js",
     "lint": "oxlint --deny-warnings",
