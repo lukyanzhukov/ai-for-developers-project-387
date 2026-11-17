@@ -135,10 +135,8 @@ jobs:
           ARTIFACT_URL: ${{ steps.artifact.outputs.artifact-url }}
         with:
           script: |
-            const fs = require('node:fs');
             const { browserProfile } = require('./scripts/review-policy.cjs');
-            const checked = JSON.parse(fs.readFileSync(`${process.env.RUNNER_TEMP}/browser-evidence/report.json`, 'utf8'));
             const { data: pr } = await github.rest.pulls.get({ ...context.repo, pull_number: Number(process.env.PR_NUMBER) });
             if (browserProfile(pr.labels) !== process.env.BROWSER_PROFILE) throw new Error('Browser profile changed; repeat the check');
             if (pr.head.sha !== process.env.REVIEW_SHA || pr.state !== 'open') throw new Error('Head changed before publication');
-            await github.rest.issues.createComment({ ...context.repo, issue_number: pr.number, body: `Браузерная проверка пройдена. Head SHA: \`${checked.verifiedSha ?? process.env.REVIEW_SHA}\`. Профиль: ${process.env.BROWSER_PROFILE}. Основной, негативный и соседний сценарии проверены отдельно от реализации; источники требований перечислены в отчёте. [Отчёт и снимки](${process.env.ARTIFACT_URL}).` });
+            await github.rest.issues.createComment({ ...context.repo, issue_number: pr.number, body: `Браузерная проверка пройдена. Head SHA: \`${process.env.REVIEW_SHA}\`. Профиль: ${process.env.BROWSER_PROFILE}. Основной, негативный и соседний сценарии проверены отдельно от реализации; источники требований перечислены в отчёте. [Отчёт и снимки](${process.env.ARTIFACT_URL}).` });

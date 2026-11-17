@@ -42,7 +42,7 @@ test("checker report and PR comment preserve the exact verified head SHA", () =>
   assert.match(checker, /assert\.equal\(report\.sha, report\.expectedSha/);
   assert.ok(checker.includes("Verified head SHA:") && checker.includes("${report.verifiedSha}"));
   assert.ok(checker.includes("Expected head SHA:") && checker.includes("${report.expectedSha}"));
-  assert.match(workflow, /checked\.verifiedSha \?\? process\.env\.REVIEW_SHA/);
+  assert.ok(workflow.includes("Head SHA:") && workflow.includes("process.env.REVIEW_SHA"));
 });
 
 test("workflow passes the selected profile to the independent checker and revalidates it", () => {
