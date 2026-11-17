@@ -12,12 +12,11 @@ import {
   TextInput,
   Title,
 } from "@mantine/core";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { Booking, BookingList, MeetingType } from "../generated/api/types.gen.ts";
 import { MonthCalendar } from "./MonthCalendar.tsx";
 import "./app.css";
 
-type VariantKey = "A" | "B" | "C";
 type ScenarioKey = "all" | "multi" | "disabled" | "calendar" | "combined" | "empty" | "refreshed";
 type Mode = "list" | "calendar";
 
@@ -141,12 +140,6 @@ const data: BookingList = {
   ],
 };
 
-const variants: Array<{ key: VariantKey; name: string }> = [
-  { key: "A", name: "Фильтр в поиске" },
-  { key: "B", name: "Панель фильтров" },
-  { key: "C", name: "Компактный тулбар" },
-];
-
 const scenarios: Scenario[] = [
   { key: "all", label: "Все типы", mode: "list", selected: [], query: "" },
   {
@@ -183,13 +176,9 @@ const scenarios: Scenario[] = [
   },
 ];
 
-function readView(): { variant: VariantKey; scenario: ScenarioKey } {
-  const params = new URLSearchParams(window.location.search);
-  const rawVariant = params.get("variant");
-  const rawScenario = params.get("scenario");
-  const variant = variants.find((item) => item.key === rawVariant)?.key ?? "A";
-  const scenario = scenarios.find((item) => item.key === rawScenario)?.key ?? "all";
-  return { variant, scenario };
+function readScenario(): ScenarioKey {
+  const raw = new URLSearchParams(window.location.search).get("scenario");
+  return scenarios.find((item) => item.key === raw)?.key ?? "all";
 }
 
 function normalize(value: string): string {
@@ -206,12 +195,14 @@ function dateKey(utcIso: string): string {
 }
 
 function dayLabel(date: string): string {
-  return new Intl.DateTimeFormat("ru-RU", {
+  const label = new Intl.DateTimeFormat("ru-RU", {
     timeZone: "UTC",
-    weekday: "long",
+    weekday: date === dateKey(data.serverNow) ? undefined : "long",
     day: "numeric",
     month: "long",
+    year: date.slice(0, 4) === dateKey(data.serverNow).slice(0, 4) ? undefined : "numeric",
   }).format(new Date(`${date}T12:00:00.000Z`));
+  return date === dateKey(data.serverNow) ? `Сегодня · ${label}` : label;
 }
 
 function timeLabel(utcIso: string): string {
@@ -224,7 +215,7 @@ function timeLabel(utcIso: string): string {
 
 function SearchGlyph() {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <svg className="owner-search-glyph" viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <circle cx="10.8" cy="10.8" r="6.3" stroke="currentColor" strokeWidth="1.8" />
       <path d="m15.5 15.5 4.2 4.2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
     </svg>
@@ -241,7 +232,7 @@ function Highlight({ text, query }: { text: string; query: string }) {
   return (
     <>
       {text.slice(0, start)}
-      <mark className="owner-highlight">{text.slice(start, start + needle.length)}</mark>
+      <mark>{text.slice(start, start + needle.length)}</mark>
       {text.slice(start + needle.length)}
     </>
   );
@@ -250,101 +241,70 @@ function Highlight({ text, query }: { text: string; query: string }) {
 function BookingRow({ booking, query }: { booking: Booking; query: string }) {
   const [hours, minutes] = timeLabel(booking.startsAt).split(":");
   return (
-    <Paper withBorder radius="md" p="sm" className="owner-booking">
-      <Group wrap="nowrap" gap="sm" align="flex-start">
-        <div className="owner-booking-time">
-          <span className="owner-time-hour">{hours}</span>
-          <span className="owner-time-mins">{minutes}</span>
-        </div>
-        <Stack gap={2} style={{ minWidth: 0, flex: 1 }}>
-          <Text fw={600} size="sm">
-            <Highlight text={booking.guestName} query={query} />
-          </Text>
-          <Text size="xs" c="dimmed">
-            <Highlight text={booking.guestEmail} query={query} />
-          </Text>
-          <Group gap={6} mt={4}>
-            <Badge size="xs" variant="light" color="orange">
-              {booking.meetingTypeTitle}
-            </Badge>
-            <Badge size="xs" variant="default">
-              {booking.durationMinutes} мин
-            </Badge>
-          </Group>
-        </Stack>
-      </Group>
+    <Paper p="lg" radius="md" withBorder className="owner-booking-card">
+      <div className="owner-booking-time">
+        <Text size="sm" fw={600} className="owner-time-hour">
+          {hours}
+        </Text>
+        <Text size="xs" c="dimmed" className="owner-time-mins">
+          {minutes}
+        </Text>
+      </div>
+      <div>
+        <Text size="sm" fw={600}>
+          <Highlight text={booking.guestName} query={query} />
+        </Text>
+        <Text size="sm" c="dimmed" mt={4}>
+          <Highlight text={booking.guestEmail} query={query} />
+        </Text>
+        <Group gap={8} mt={10}>
+          <Badge size="sm" variant="light" color="orange">
+            {booking.meetingTypeTitle}
+          </Badge>
+          <Badge size="sm" variant="default">
+            {booking.durationMinutes} мин
+          </Badge>
+        </Group>
+      </div>
     </Paper>
   );
 }
 
-function Results({
+function MeetingList({
   items,
-  mode,
-  date,
-  onDateChange,
   query,
-  filtering,
-  countLabel,
+  emptyLabel,
 }: {
   items: Booking[];
-  mode: Mode;
-  date: string;
-  onDateChange: (value: string) => void;
   query: string;
-  filtering: boolean;
-  countLabel: string;
+  emptyLabel: string;
 }) {
-  return (
-    <Stack gap="md">
-      <Group justify="space-between" gap="sm" wrap="wrap">
-        <Text fw={600}>{countLabel}</Text>
-        <Text size="xs" c="dimmed">
-          {filtering
-            ? "Фильтр действует на все даты; выбранный день в календаре не ограничивает результат"
-            : "Показаны все предстоящие встречи"}
-        </Text>
-      </Group>
+  if (items.length === 0) {
+    return (
+      <Text component="output" c="dimmed" className="owner-search-empty">
+        {emptyLabel}
+      </Text>
+    );
+  }
 
-      {items.length === 0 ? (
-        <Paper withBorder radius="md" p="xl" className="owner-empty-list">
-          <Text fw={600}>Ничего не найдено</Text>
-          <Text size="sm" c="dimmed" mt={4}>
-            Попробуйте сбросить тип или поисковый запрос
-          </Text>
-        </Paper>
-      ) : mode === "list" ? (
-        <Stack gap="xs">
-          {items.map((booking) => (
-            <BookingRow key={booking.id} booking={booking} query={query} />
-          ))}
-        </Stack>
-      ) : (
-        <Paper withBorder radius="md" p="md">
-          <MonthCalendar
-            start={dateKey(data.serverNow)}
-            end={new Date(Date.UTC(Number(date.slice(0, 4)), Number(date.slice(5, 7)), 0))
-              .toISOString()
-              .slice(0, 10)}
-            markedDates={[...new Set(items.map((booking) => dateKey(booking.startsAt)))]}
-            legend={filtering ? "Совпадения" : "Встречи"}
-            date={date}
-            onChange={onDateChange}
-          />
-          <Text fw={600} mt="lg" mb="xs">
-            {filtering ? "Совпадения по всем датам" : dayLabel(date)}
-          </Text>
-          <Stack gap="xs">
-            {items.map((booking) => (
-              <BookingRow key={booking.id} booking={booking} query={query} />
-            ))}
-          </Stack>
-        </Paper>
-      )}
+  return (
+    <Stack
+      component="ul"
+      aria-label="Предстоящие встречи"
+      p={0}
+      m={0}
+      style={{ listStyle: "none" }}
+    >
+      {items.map((booking) => (
+        <li key={booking.id}>
+          <BookingRow booking={booking} query={query} />
+        </li>
+      ))}
     </Stack>
   );
 }
 
-function MockupScreen({ variant, scenario }: { variant: VariantKey; scenario: Scenario }) {
+function MockupScreen({ scenario }: { scenario: Scenario }) {
   const [selectedTypes, setSelectedTypes] = useState<string[]>(scenario.selected);
   const [query, setQuery] = useState(scenario.query);
   const [mode, setMode] = useState<Mode>(scenario.mode);
@@ -409,192 +369,154 @@ function MockupScreen({ variant, scenario }: { variant: VariantKey; scenario: Sc
       ? `Всего: ${items.length}`
       : `На выбранный день: ${items.length}`;
 
-  const typeSelect = (
-    <MultiSelect
-      label="Тип встречи"
-      placeholder="Все типы"
-      aria-label="Тип встречи"
-      data={options}
-      value={selectedTypes}
-      onChange={setSelectedTypes}
-      clearable
-      searchable
-      defaultDropdownOpened={scenario.openDropdown}
-      renderOption={({ option }) => (
-        <Group justify="space-between" gap="xs" wrap="nowrap">
-          <span>{option.label}</span>
-          {option.disabled ? (
-            <Badge size="xs" variant="default">
-              недоступно
-            </Badge>
-          ) : null}
-        </Group>
-      )}
-      styles={{ dropdown: { zIndex: 1200 } }}
-    />
-  );
-
-  const allTypesButton = (
-    <Button
-      variant={selectedTypes.length === 0 ? "light" : "default"}
-      size="sm"
-      onClick={() => setSelectedTypes([])}
-    >
-      Все типы
-    </Button>
-  );
-
-  const searchField = (
-    <TextInput
-      aria-label="Поиск по гостям"
-      placeholder="Имя или email гостя"
-      value={query}
-      onChange={(event) => setQuery(event.currentTarget.value)}
-      leftSection={<SearchGlyph />}
-      rightSection={
-        query ? (
-          <ActionIcon variant="subtle" aria-label="Очистить поиск" onClick={() => setQuery("")}>
-            ×
-          </ActionIcon>
-        ) : null
-      }
-    />
-  );
-
-  const refreshButton = (
-    <Button
-      variant="default"
-      size="sm"
-      onClick={() =>
-        setVisibleItems((current) =>
-          current.filter((item) => !selectedTypes.includes(item.meetingTypeId)),
-        )
-      }
-    >
-      Обновить
-    </Button>
-  );
-
-  const viewToggle = (
-    <SegmentedControl
-      size="sm"
-      value={mode}
-      onChange={(value) => setMode(value as Mode)}
-      data={[
-        { value: "list", label: "Список" },
-        { value: "calendar", label: "Календарь" },
-      ]}
-    />
-  );
-
-  const results = (
-    <Results
-      items={items}
-      mode={mode}
-      date={effectiveDate}
-      onDateChange={setDate}
-      query={query}
-      filtering={filtering}
-      countLabel={countLabel}
-    />
-  );
-
   return (
-    <Container size="xl" py="xl" data-mockup-ready>
-      <Group justify="space-between" gap="md" wrap="wrap" mb="lg">
-        <Group gap="md">
+    <Stack className="upcoming-page" gap="lg">
+      <Group justify="space-between" align="flex-start">
+        <div>
           <Title order={2}>Предстоящие встречи</Title>
-          <Badge color="orange" variant="light">
-            МАКЕТ · вымышленные данные
-          </Badge>
-        </Group>
-        <Group gap="xs">
-          {refreshButton}
-          {viewToggle}
-        </Group>
+          <Text size="sm" c="dimmed" mt={6}>
+            Время встреч: Asia/Novokuznetsk
+          </Text>
+        </div>
+        <Button
+          variant="default"
+          onClick={() =>
+            setVisibleItems((current) =>
+              current.filter((item) => !selectedTypes.includes(item.meetingTypeId)),
+            )
+          }
+        >
+          Обновить
+        </Button>
       </Group>
 
-      {variant === "A" ? (
-        <Stack gap="lg" pb={110}>
-          <Paper withBorder radius="md" p="md" className="owner-search-field">
-            <Text fw={600} mb="xs">
-              Поиск и фильтр
-            </Text>
-            {searchField}
-            <Group align="flex-end" gap="sm" wrap="wrap" mt="sm">
-              <div style={{ flex: "1 1 260px" }}>{typeSelect}</div>
-              {allTypesButton}
+      <Paper withBorder p="lg" radius="lg" className="owner-search-field">
+        <TextInput
+          aria-label="Поиск по имени или email"
+          placeholder="Имя или email гостя"
+          value={query}
+          onChange={(event) => setQuery(event.currentTarget.value)}
+          leftSection={<SearchGlyph />}
+          rightSection={
+            query ? (
+              <ActionIcon
+                variant="subtle"
+                color="gray"
+                size="sm"
+                radius="xl"
+                aria-label="Очистить поиск"
+                onClick={() => setQuery("")}
+              >
+                ×
+              </ActionIcon>
+            ) : undefined
+          }
+          rightSectionPointerEvents="all"
+        />
+        <MultiSelect
+          label="Тип встречи"
+          placeholder="Все типы"
+          aria-label="Тип встречи"
+          data={options}
+          value={selectedTypes}
+          onChange={setSelectedTypes}
+          clearable
+          searchable
+          defaultDropdownOpened={scenario.openDropdown}
+          styles={{ dropdown: { zIndex: 1200 } }}
+          renderOption={({ option }) => (
+            <Group justify="space-between" gap="xs" wrap="nowrap">
+              <span>{option.label}</span>
+              {option.disabled ? (
+                <Badge size="xs" variant="default">
+                  недоступно
+                </Badge>
+              ) : null}
             </Group>
-            <Text size="xs" c="dimmed" mt="xs">
-              Пустой выбор означает «Все типы»; кнопка сбрасывает только тип
-            </Text>
-          </Paper>
-          {results}
-        </Stack>
-      ) : null}
+          )}
+        />
+        <Group justify="space-between" mt="sm" gap="xs">
+          <Text size="xs" c="dimmed">
+            Часть имени или email, без учёта регистра; пустой выбор типов означает «Все типы»
+          </Text>
+          <Text size="xs" fw={600} className="owner-search-count">
+            {countLabel}
+          </Text>
+        </Group>
+      </Paper>
 
-      {variant === "B" ? (
-        <Stack gap="lg" pb={110}>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "minmax(240px, 300px) minmax(0, 1fr)",
-              gap: 20,
-              alignItems: "start",
-            }}
-          >
-            <Paper withBorder radius="md" p="md">
-              <Text fw={600} mb="sm">
-                Фильтр по типу
-              </Text>
-              <Stack gap="sm">
-                {typeSelect}
-                {allTypesButton}
-                <Text size="xs" c="dimmed">
-                  Типы без встреч недоступны, но уже выбранный тип остаётся удаляемым
-                </Text>
-              </Stack>
-            </Paper>
-            <Stack gap="md">
-              {searchField}
-              {results}
-            </Stack>
-          </div>
-        </Stack>
-      ) : null}
+      <Group justify="space-between">
+        <SegmentedControl
+          className="owner-view-toggle"
+          radius="xl"
+          color="dark"
+          aria-label="Режим просмотра"
+          value={mode}
+          onChange={(value) => setMode(value as Mode)}
+          data={[
+            { value: "list", label: "Список" },
+            { value: "calendar", label: "Календарь" },
+          ]}
+        />
+        <Text size="sm" c="dimmed">
+          {countLabel}
+        </Text>
+      </Group>
 
-      {variant === "C" ? (
-        <Stack gap="lg" pb={110}>
-          <Paper withBorder radius="md" p="md" className="owner-search-field">
-            <Group align="flex-end" gap="sm" wrap="wrap">
-              <div style={{ flex: "1 1 260px" }}>{searchField}</div>
-              <div style={{ width: 280 }}>{typeSelect}</div>
-              {allTypesButton}
-            </Group>
-          </Paper>
-          {results}
-        </Stack>
-      ) : null}
-    </Container>
+      <Paper
+        withBorder={mode === "calendar"}
+        bg={mode === "calendar" ? "white" : "transparent"}
+        className={mode === "calendar" ? "owner-calendar-layout" : undefined}
+      >
+        {mode === "calendar" && (
+          <MonthCalendar
+            start={today}
+            end={monthEnd}
+            markedDates={[...new Set(matches.map((item) => dateKey(item.startsAt)))]}
+            date={effectiveDate}
+            onChange={setDate}
+            legend="Есть встречи"
+          />
+        )}
+        <section
+          className={mode === "calendar" ? "owner-agenda" : "owner-list"}
+          aria-label={
+            mode === "calendar"
+              ? filtering
+                ? "Все совпадения"
+                : "Встречи на выбранную дату"
+              : "Все предстоящие встречи"
+          }
+        >
+          {mode === "calendar" && (
+            <Title order={3} size="h4" mb="lg">
+              {filtering ? "Совпадения по всем датам" : dayLabel(effectiveDate)}
+            </Title>
+          )}
+          <MeetingList
+            items={items}
+            query={query}
+            emptyLabel={
+              filtering
+                ? "Ничего не найдено"
+                : items.length === 0 && visibleItems.length > 0
+                  ? "На этот день встреч нет"
+                  : "Предстоящих встреч пока нет"
+            }
+          />
+        </section>
+      </Paper>
+    </Stack>
   );
 }
 
 function PrototypeBar({
-  variant,
   scenarioKey,
-  previousVariant,
-  nextVariant,
-  onVariant,
   onScenario,
 }: {
-  variant: VariantKey;
   scenarioKey: ScenarioKey;
-  previousVariant: VariantKey;
-  nextVariant: VariantKey;
-  onVariant: (key: VariantKey) => void;
   onScenario: (key: ScenarioKey) => void;
 }) {
-  const name = variants.find((item) => item.key === variant)?.name ?? "";
   return (
     <Paper
       shadow="lg"
@@ -610,99 +532,32 @@ function PrototypeBar({
         maxWidth: "calc(100vw - 32px)",
       }}
     >
-      <Stack gap={6}>
-        <Group gap={4} justify="center" wrap="wrap">
-          {scenarios.map((item) => (
-            <Button
-              key={item.key}
-              size="compact-xs"
-              radius="md"
-              variant={item.key === scenarioKey ? "filled" : "subtle"}
-              color={item.key === scenarioKey ? "orange" : "gray"}
-              onClick={() => onScenario(item.key)}
-            >
-              {item.label}
-            </Button>
-          ))}
-        </Group>
-        {import.meta.env.DEV ? (
-          <Group gap="sm" wrap="nowrap" justify="center">
-            <ActionIcon
-              size="sm"
-              variant="subtle"
-              color="gray"
-              aria-label="Предыдущий вариант"
-              onClick={() => onVariant(previousVariant)}
-            >
-              ‹
-            </ActionIcon>
-            <Text size="xs" fw={600} c="white">
-              {variant} · {name}
-            </Text>
-            <ActionIcon
-              size="sm"
-              variant="subtle"
-              color="gray"
-              aria-label="Следующий вариант"
-              onClick={() => onVariant(nextVariant)}
-            >
-              ›
-            </ActionIcon>
-          </Group>
-        ) : null}
-      </Stack>
+      <Group gap={4} justify="center" wrap="wrap">
+        {scenarios.map((item) => (
+          <Button
+            key={item.key}
+            size="compact-xs"
+            radius="md"
+            variant={item.key === scenarioKey ? "filled" : "subtle"}
+            color={item.key === scenarioKey ? "orange" : "gray"}
+            onClick={() => onScenario(item.key)}
+          >
+            {item.label}
+          </Button>
+        ))}
+      </Group>
     </Paper>
   );
 }
 
 export function MeetingTypeFilterMockup() {
-  const [view, setView] = useState(readView);
-  const variantIndex = variants.findIndex((item) => item.key === view.variant);
-  const previousVariant = variants[(variantIndex - 1 + variants.length) % variants.length].key;
-  const nextVariant = variants[(variantIndex + 1) % variants.length].key;
-  const scenario = scenarios.find((item) => item.key === view.scenario) ?? scenarios[0];
-
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      const target = event.target as HTMLElement | null;
-      if (
-        target &&
-        (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)
-      ) {
-        return;
-      }
-      if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
-      event.preventDefault();
-      const nextIndex =
-        (variantIndex + (event.key === "ArrowRight" ? 1 : -1) + variants.length) % variants.length;
-      setView((current) => ({ ...current, variant: variants[nextIndex].key }));
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [variantIndex]);
-
-  useEffect(() => {
-    const url = new URL(window.location.href);
-    url.searchParams.set("variant", view.variant);
-    url.searchParams.set("scenario", view.scenario);
-    window.history.replaceState(null, "", `${url.pathname}${url.search}`);
-  }, [view]);
+  const [scenarioKey, setScenarioKey] = useState(readScenario);
+  const scenario = scenarios.find((item) => item.key === scenarioKey) ?? scenarios[0];
 
   return (
-    <>
-      <MockupScreen
-        key={`${view.variant}-${view.scenario}`}
-        variant={view.variant}
-        scenario={scenario}
-      />
-      <PrototypeBar
-        variant={view.variant}
-        scenarioKey={view.scenario}
-        previousVariant={previousVariant}
-        nextVariant={nextVariant}
-        onVariant={(key) => setView((current) => ({ ...current, variant: key }))}
-        onScenario={(key) => setView((current) => ({ ...current, scenario: key }))}
-      />
-    </>
+    <Container size="xl" py="xl" data-mockup-ready>
+      <MockupScreen key={scenario.key} scenario={scenario} />
+      <PrototypeBar scenarioKey={scenario.key} onScenario={setScenarioKey} />
+    </Container>
   );
 }
