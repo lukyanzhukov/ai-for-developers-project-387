@@ -4,6 +4,7 @@ import {
   Badge,
   Button,
   Group,
+  MultiSelect,
   Paper,
   SegmentedControl,
   Stack,
@@ -13,8 +14,8 @@ import {
 } from "@mantine/core";
 import { MonthCalendar } from "./MonthCalendar.tsx";
 import { useEffect, useState } from "react";
-import { listBookings } from "../generated/api/sdk.gen.ts";
-import type { BookingList } from "../generated/api/types.gen.ts";
+import { listBookings, listMeetingTypes } from "../generated/api/sdk.gen.ts";
+import type { BookingList, MeetingType } from "../generated/api/types.gen.ts";
 
 function normalize(value: string) {
   return value.trim().toLocaleLowerCase("ru-RU");
@@ -52,6 +53,9 @@ export function UpcomingBookings() {
   const [mode, setMode] = useState("list");
   const [query, setQuery] = useState("");
   const [attempt, setAttempt] = useState(0);
+  const [selectedTypeIds, setSelectedTypeIds] = useState<string[]>([]);
+  const [types, setTypes] = useState<MeetingType[]>();
+  const [typesError, setTypesError] = useState(false);
   useEffect(() => {
     const controller = new AbortController();
     void listBookings({
@@ -70,6 +74,24 @@ export function UpcomingBookings() {
     return () => controller.abort();
   }, [attempt]);
 
+  useEffect(() => {
+    const controller = new AbortController();
+    void listMeetingTypes({
+      throwOnError: true,
+      signal: AbortSignal.any([controller.signal, AbortSignal.timeout(10000)]),
+    })
+      .then(({ data }) => {
+        if (!controller.signal.aborted) {
+          setTypes(data.items);
+          setTypesError(false);
+        }
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setTypesError(true);
+      });
+    return () => controller.abort();
+  }, []);
+
   const dateKey = (instant: string) =>
     new Intl.DateTimeFormat("en-CA", {
       timeZone: data?.timeZone ?? "Asia/Novokuznetsk",
@@ -79,6 +101,30 @@ export function UpcomingBookings() {
     }).format(new Date(instant));
   const today = data ? dateKey(data.serverNow) : "";
   const allItems = data?.items ?? [];
+  const typeCounts = new Map<string, number>();
+  for (const item of allItems) {
+    typeCounts.set(item.meetingTypeId, (typeCounts.get(item.meetingTypeId) ?? 0) + 1);
+  }
+  const typeOptions = [...(types ?? [])]
+    .sort((a, b) => {
+      const aActive = (typeCounts.get(a.id) ?? 0) > 0 || selectedTypeIds.includes(a.id);
+      const bActive = (typeCounts.get(b.id) ?? 0) > 0 || selectedTypeIds.includes(b.id);
+      return Number(bActive) - Number(aActive) || a.title.localeCompare(b.title, "ru");
+    })
+    .map((type) => {
+      const count = typeCounts.get(type.id) ?? 0;
+      const selected = selectedTypeIds.includes(type.id);
+      return {
+        value: type.id,
+        label:
+          count > 0
+            ? `${type.title} · ${count}`
+            : selected
+              ? `${type.title} · нет встреч · выбрано`
+              : `${type.title} · нет встреч`,
+        disabled: count === 0 && !selected,
+      };
+    });
   const allDates = allItems.map((item) => dateKey(item.startsAt));
   const lastDate = allDates.at(-1) ?? today;
   const endOfMonth = data ? new Date(`${lastDate.slice(0, 7)}-01T12:00:00Z`) : undefined;
@@ -88,17 +134,20 @@ export function UpcomingBookings() {
   const selectedDate = date >= today && date <= end ? date : (allDates[0] ?? today);
   const needle = normalize(query);
   const searching = needle.length > 0;
-  const matches = searching
-    ? allItems.filter(
-        (item) =>
-          normalize(item.guestName).includes(needle) || normalize(item.guestEmail).includes(needle),
-      )
-    : allItems;
+  const filtering = selectedTypeIds.length > 0;
+  const hasCondition = searching || filtering;
+  const matches = allItems.filter(
+    (item) =>
+      (!filtering || selectedTypeIds.includes(item.meetingTypeId)) &&
+      (!searching ||
+        normalize(item.guestName).includes(needle) ||
+        normalize(item.guestEmail).includes(needle)),
+  );
   const meetings =
-    mode === "calendar" && !searching
+    mode === "calendar" && !hasCondition
       ? matches.filter((item) => dateKey(item.startsAt) === selectedDate)
       : matches;
-  const markedDates = searching
+  const markedDates = hasCondition
     ? [...new Set(matches.map((item) => dateKey(item.startsAt)))]
     : allDates;
   const counts = new Map<string, number>();
@@ -106,7 +155,7 @@ export function UpcomingBookings() {
     const day = dateKey(item.startsAt);
     counts.set(day, (counts.get(day) ?? 0) + 1);
   }
-  const countLabel = searching
+  const countLabel = hasCondition
     ? `Совпадений: ${matches.length}`
     : mode === "list"
       ? `Всего: ${meetings.length}`
@@ -172,9 +221,31 @@ export function UpcomingBookings() {
           }
           rightSectionPointerEvents="all"
         />
+        <MultiSelect
+          label="Тип встречи"
+          placeholder="Все типы"
+          aria-label="Тип встречи"
+          data={typeOptions}
+          value={selectedTypeIds}
+          onChange={setSelectedTypeIds}
+          clearable
+          searchable
+          disabled={typesError && !types}
+          styles={{ dropdown: { zIndex: 1200 } }}
+          renderOption={({ option }) => (
+            <Group justify="space-between" gap="xs" wrap="nowrap">
+              <span>{option.label}</span>
+              {option.disabled ? (
+                <Badge size="xs" variant="default">
+                  недоступно
+                </Badge>
+              ) : null}
+            </Group>
+          )}
+        />
         <Group justify="space-between" mt="sm" gap="xs">
           <Text size="xs" c="dimmed">
-            Часть имени или email, без учёта регистра
+            Часть имени или email, без учёта регистра; пустой выбор типов означает «Все типы»
           </Text>
           {data && (
             <Text size="xs" fw={600} className="owner-search-count">
@@ -251,7 +322,7 @@ export function UpcomingBookings() {
             className={mode === "calendar" ? "owner-agenda" : "owner-list"}
             aria-label={
               mode === "calendar"
-                ? searching
+                ? hasCondition
                   ? "Все совпадения"
                   : "Встречи на выбранную дату"
                 : "Все предстоящие встречи"
@@ -259,11 +330,11 @@ export function UpcomingBookings() {
           >
             {mode === "calendar" && (
               <Title order={3} size="h4" mb="lg">
-                {searching ? "Совпадения по всем датам" : dayLabel(selectedDate)}
+                {hasCondition ? "Совпадения по всем датам" : dayLabel(selectedDate)}
               </Title>
             )}
             {meetings.length === 0 ? (
-              searching ? (
+              hasCondition ? (
                 <Text component="output" c="dimmed" className="owner-search-empty">
                   Ничего не найдено
                 </Text>
@@ -291,7 +362,7 @@ export function UpcomingBookings() {
                   });
                   return (
                     <li key={item.id}>
-                      {(mode === "list" || searching) &&
+                      {(mode === "list" || hasCondition) &&
                         (index === 0 ||
                           dateKey(meetings[index - 1].startsAt) !== dateKey(item.startsAt)) && (
                           <Group justify="space-between" className="owner-date-heading">
