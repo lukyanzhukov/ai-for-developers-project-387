@@ -230,6 +230,52 @@ DEPLOYMENT_URL=https://call-calendar-386-o6lw.onrender.com mise run deployment:c
 
 ## Плановые аудиты
 
+### Доступность интерфейса Call Calendar
+
+[Service accessibility audit](.github/workflows/service-audit.yml) запускается
+на `main` ежедневно в **02:47 UTC / 09:47 Asia/Novokuznetsk** и вручную. Workflow
+собирает Call Calendar из коммита запуска, поднимает сервер на loopback-адресе
+GitHub runner и ждёт ответа `/api/health`. Lighthouse проверяет доступность
+интерфейса главной страницы. Проверка воспроизводится на конкретной сборке
+и не зависит от состояния хостинга. У каждого job тайм-аут 20 минут, запуски
+сериализованы через concurrency.
+
+OpenCode получает нарушения проверок Lighthouse и заголовки существующих issues.
+Он объясняет последствия для пользователя, предлагает действие и отмечает
+совпадения с известными проблемами. Шаг анализа использует существующий секрет
+`OPENCODE_API_KEY`. Публикация выполняется штатным `GITHUB_TOKEN` с
+`issues: write` в отдельном job. Перед созданием issue публикатор ещё раз читает
+открытые и закрытые issues. Маркер из маршрута страницы, ID проверки и режима
+аудита сохраняет дедупликацию при изменении текста ответа агента. Новые issues
+получают `workflow:request` и `needs-triage`.
+
+Отчёт Lighthouse, вывод агента и диагностика лежат в артефакте
+`service-audit-report`. Решения о создании и пропуске issues доступны в
+`service-audit-publication` и сводке запуска. Артефакты хранятся 30 дней.
+Issue сохраняет описание проблемы, предлагаемое действие и ссылку на запуск.
+Если находок нет, сводка фиксирует этот результат. Ошибка измерения или агента
+отмечается как сбой прогона.
+
+Ручная проверка после слияния в `main`:
+
+```bash
+gh workflow run service-audit.yml --ref main
+# Демонстрация публикации с одинаковыми учебными данными
+gh workflow run service-audit.yml --ref main -f exercise=true
+gh workflow run service-audit.yml --ref main -f exercise=true
+```
+
+Учебный режим подставляет отчёт с отсутствующим `lang` на элементе `html`.
+Первый прогон создаёт issue с префиксом `[Учебный аудит]`, второй ссылается на тот же
+issue. Локальный тест `mise run audit:test` проверяет этот сценарий с имитацией
+OpenCode и GitHub API, включая закрытый issue.
+
+При локальной проверке собранного приложения Lighthouse зафиксировал
+`color-contrast` на 15 элементах главной страницы. Фактический прогон из `main`
+и ссылки на его результаты добавляются после публикации workflow.
+
+### TODO/FIXME и зависимости
+
 Два независимых GitHub Actions workflow работают на `main`: `todo-audit.yml` ищет
 подтверждённые TODO/FIXME по понедельникам в **02:17 UTC / 09:17 Asia/Novokuznetsk**;
 `lockfile-audit.yml` проверяет `pnpm-lock.yaml` ежедневно в **01:37 UTC / 08:37
