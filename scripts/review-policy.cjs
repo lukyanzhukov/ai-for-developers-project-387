@@ -32,16 +32,23 @@ async function reserveReview(args) {
   return { ...pr, ...(await reserve({ ...args, number: pr.number, lane: "review" })) };
 }
 
+const browserProfiles = {
+  "browser:keyboard": "keyboard-search",
+  "browser:type-filter": "type-filter",
+};
+
 function browserProfile(labels = []) {
   const names = labels.map((label) => label.name);
-  if (
-    names.some(
-      (name) =>
-        typeof name === "string" && name.startsWith("browser:") && name !== "browser:keyboard",
+  for (const name of names) {
+    if (
+      typeof name === "string" &&
+      name.startsWith("browser:") &&
+      !Object.hasOwn(browserProfiles, name)
     )
-  )
-    throw new Error("Unknown browser profile label");
-  return names.includes("browser:keyboard") ? "keyboard-search" : "search";
+      throw new Error("Unknown browser profile label");
+  }
+  const selected = Object.entries(browserProfiles).find(([label]) => names.includes(label));
+  return selected ? selected[1] : "search";
 }
 
 module.exports = { reserveReview, target, browserProfile };
