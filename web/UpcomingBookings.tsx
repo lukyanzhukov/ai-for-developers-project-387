@@ -56,6 +56,7 @@ export function UpcomingBookings() {
   const [selectedTypeIds, setSelectedTypeIds] = useState<string[]>([]);
   const [types, setTypes] = useState<MeetingType[]>();
   const [typesError, setTypesError] = useState(false);
+  const [typesAttempt, setTypesAttempt] = useState(0);
   useEffect(() => {
     const controller = new AbortController();
     void listBookings({
@@ -90,7 +91,12 @@ export function UpcomingBookings() {
         if (!controller.signal.aborted) setTypesError(true);
       });
     return () => controller.abort();
-  }, []);
+  }, [typesAttempt]);
+
+  const retryTypes = () => {
+    setTypesError(false);
+    setTypesAttempt((current) => current + 1);
+  };
 
   const dateKey = (instant: string) =>
     new Intl.DateTimeFormat("en-CA", {
@@ -187,6 +193,7 @@ export function UpcomingBookings() {
             setLoading(true);
             setError(false);
             setAttempt((value) => value + 1);
+            setTypesAttempt((value) => value + 1);
           }}
         >
           {error ? "Повторить" : "Обновить"}
@@ -243,6 +250,20 @@ export function UpcomingBookings() {
             </Group>
           )}
         />
+        {typesError && (
+          <Alert color={types ? "yellow" : "red"} variant="light" mt="sm" role="alert">
+            <Group justify="space-between" align="center" gap="xs" wrap="nowrap">
+              <Text size="sm">
+                {types
+                  ? "Не удалось обновить типы встреч. Показан ранее загруженный список"
+                  : "Не удалось загрузить типы встреч. Попробуйте ещё раз."}
+              </Text>
+              <Button size="xs" variant="default" onClick={retryTypes}>
+                Повторить
+              </Button>
+            </Group>
+          </Alert>
+        )}
         <Group justify="space-between" mt="sm" gap="xs">
           <Text size="xs" c="dimmed">
             Часть имени или email, без учёта регистра; пустой выбор типов означает «Все типы»

@@ -319,3 +319,101 @@ test("owner can still search and use the calendar without selecting a meeting ty
     },
   );
 });
+
+const errorTexts = {
+  load: "Не удалось загрузить типы встреч. Попробуйте ещё раз.",
+  refresh: "Не удалось обновить типы встреч. Показан ранее загруженный список",
+};
+
+for (const viewport of [
+  { width: 1280, height: 900 },
+  { width: 390, height: 844 },
+]) {
+  test(`owner retries a failed first meeting type load at ${viewport.width}px`, async () => {
+    await withPage(
+      meetingTypes,
+      { now: ["2026-11-09T01:00:00Z"], bookings },
+      async (page, server) => {
+        let bookingRequests = 0;
+        page.on("request", (request) => {
+          if (request.url().includes("/api/bookings")) bookingRequests += 1;
+        });
+        const blockTypes = (route: { abort: () => Promise<void> }) => route.abort();
+        await page.route("**/api/meeting-types", blockTypes);
+        await page.goto(`${server.address}/admin?view=bookings`);
+        await page.getByText("Анна Иванова").first().waitFor();
+        expect(bookingRequests).toBe(1);
+
+        expect(await typeCombobox(page).isDisabled()).toBe(true);
+        expect(await page.getByText(errorTexts.load, { exact: true }).count()).toBe(1);
+        const retry = page.getByRole("button", { name: "Повторить", exact: true });
+        expect(await retry.count()).toBe(1);
+
+        const search = page.getByLabel("Поиск по имени или email", { exact: true });
+        await search.fill("boris");
+        expect(await page.getByText("Борис Петров").count()).toBe(1);
+        expect(await countText(page)).toBe("Совпадений: 1");
+
+        await page.unroute("**/api/meeting-types", blockTypes);
+        await retry.click();
+        await page.waitForFunction(
+          () => !document.querySelector('[aria-label="Тип встречи"]')?.hasAttribute("disabled"),
+        );
+        expect(await typeCombobox(page).isEnabled()).toBe(true);
+        expect(await page.getByText(errorTexts.load, { exact: true }).count()).toBe(0);
+        expect(await search.inputValue()).toBe("boris");
+        await chooseType(page, "Консультация");
+        expect(await countText(page)).toBe("Совпадений: 1");
+        expect(bookingRequests).toBe(1);
+        expect(
+          await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
+        ).toBe(true);
+      },
+      viewport,
+    );
+  });
+
+  test(`owner keeps the filter when a meeting type refresh fails at ${viewport.width}px`, async () => {
+    await withPage(
+      meetingTypes,
+      { now: ["2026-11-09T01:00:00Z"], bookings },
+      async (page, server) => {
+        let bookingRequests = 0;
+        page.on("request", (request) => {
+          if (request.url().includes("/api/bookings")) bookingRequests += 1;
+        });
+        await page.goto(`${server.address}/admin?view=bookings`);
+        await page.getByText("Анна Иванова").first().waitFor();
+        await chooseType(page, "Знакомство");
+        const search = page.getByLabel("Поиск по имени или email", { exact: true });
+        await search.fill("анна");
+        expect(await countText(page)).toBe("Совпадений: 1");
+        expect(bookingRequests).toBe(1);
+
+        const blockTypes = (route: { abort: () => Promise<void> }) => route.abort();
+        await page.route("**/api/meeting-types", blockTypes);
+        await page.getByRole("button", { name: "Обновить", exact: true }).click();
+        await page.getByText(errorTexts.refresh, { exact: true }).first().waitFor();
+        expect(bookingRequests).toBe(2);
+        expect(await typeCombobox(page).isEnabled()).toBe(true);
+        expect(await page.locator(".mantine-MultiSelect-pill").count()).toBe(1);
+        expect(await search.inputValue()).toBe("анна");
+        expect(await countText(page)).toBe("Совпадений: 1");
+        expect(await page.getByText("Анна Иванова").count()).toBe(1);
+
+        await page.unroute("**/api/meeting-types", blockTypes);
+        await page.getByRole("button", { name: "Повторить", exact: true }).click();
+        await page.getByText(errorTexts.refresh, { exact: true }).waitFor({ state: "hidden" });
+        expect(await typeCombobox(page).isEnabled()).toBe(true);
+        expect(await page.locator(".mantine-MultiSelect-pill").count()).toBe(1);
+        expect(await search.inputValue()).toBe("анна");
+        expect(await countText(page)).toBe("Совпадений: 1");
+        expect(bookingRequests).toBe(2);
+        expect(
+          await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
+        ).toBe(true);
+      },
+      viewport,
+    );
+  });
+}
