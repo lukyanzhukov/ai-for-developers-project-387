@@ -1124,3 +1124,112 @@ test("cancelling a publisher blocked on HTTP terminates its child and releases c
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("service exercise analyzes the fixture and publishes one issue across two runs", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "service-audit-test-"));
+  const issues = [
+    {
+      number: 1,
+      title: "Real issue for the same audit ID",
+      body: "html-has-lang",
+      html_url: "https://github.com/owner/repo/issues/1",
+    },
+  ];
+  const server = createServer(async (req, res) => {
+    res.setHeader("content-type", "application/json");
+    if (req.method === "POST") {
+      let payload = "";
+      for await (const chunk of req) payload += chunk;
+      const issue = {
+        ...JSON.parse(payload),
+        number: 2,
+        state: "closed",
+        html_url: "https://github.com/owner/repo/issues/2",
+      };
+      issues.push(issue);
+      res.end(JSON.stringify(issue));
+      return;
+    }
+    res.end(JSON.stringify(issues));
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  try {
+    const agent = join(dir, "fake-opencode");
+    const response = {
+      findings: [
+        {
+          id: "html-has-lang",
+          confirmed: true,
+          title: "У страницы отсутствует язык",
+          evidence: "Учебный Lighthouse зафиксировал один элемент",
+          reason: "Скринридер может выбрать неверное произношение",
+          action: "Указать lang в элементе html",
+          duplicateOf: null,
+        },
+      ],
+    };
+    const agentEvent = { type: "text", part: { text: JSON.stringify(response) } };
+    writeFileSync(
+      agent,
+      `#!/bin/sh
+prompt=$(cat)
+printf '%s' "$prompt" | grep -q '"exercise":true' || exit 2
+printf '%s' "$prompt" | grep -q 'Real issue for the same audit ID' && exit 3
+printf '%s\\n' '${JSON.stringify(agentEvent)}'
+`,
+      { mode: 0o755 },
+    );
+    const env = {
+      GITHUB_REPOSITORY: "owner/repo",
+      GITHUB_API_URL: `http://127.0.0.1:${server.address().port}`,
+      APP_URL: "http://127.0.0.1:4173/",
+      SERVICE_AUDIT_EXERCISE: "true",
+      OPENCODE_BIN: agent,
+      GH_TOKEN: "fake",
+    };
+    for (const [runId, expected] of [
+      ["101", "create"],
+      ["102", "skip"],
+    ]) {
+      const output = join(dir, runId);
+      for (const command of ["collect", "analyze", "publish"]) {
+        await exec(process.execPath, [cli, command, "service", output], {
+          env: { ...env, GITHUB_RUN_ID: runId },
+        });
+      }
+      const decisions = JSON.parse(readFileSync(join(output, "decisions.json"), "utf8"));
+      assert.deepEqual(
+        decisions.map(({ decision }) => decision),
+        [expected],
+      );
+      assert.match(readFileSync(join(output, "report.md"), "utf8"), /issues\/2/);
+    }
+    assert.equal(issues.length, 2);
+    assert.match(issues[1].title, /^\[Учебный аудит\]/);
+    assert.match(issues[1].body, /actions\/runs\/101/);
+    assert.match(issues[1].body, /Указать lang/);
+    assert.match(issues[1].body, /^> html$/m);
+    assert.deepEqual(issues[1].labels, ["workflow:request", "needs-triage"]);
+  } finally {
+    server.closeAllConnections();
+    await new Promise((resolve) => server.close(resolve));
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("service audit records Lighthouse failures and does not produce a finding snapshot", () => {
+  const dir = mkdtempSync(join(tmpdir(), "service-audit-test-"));
+  try {
+    const rawReport = { runtimeError: { code: "ERRORED_DOCUMENT_REQUEST" } };
+    writeFileSync(join(dir, "lighthouse.json"), JSON.stringify(rawReport));
+    const run = spawnSync(process.execPath, [cli, "collect", "service", dir], {
+      env: { APP_URL: "http://127.0.0.1:4173/", SERVICE_AUDIT_EXERCISE: "false" },
+    });
+    assert.equal(run.status, 1);
+    assert.match(readFileSync(join(dir, "report.md"), "utf8"), /did not complete/);
+    assert.throws(() => readFileSync(join(dir, "input.json")), { code: "ENOENT" });
+    assert.deepEqual(JSON.parse(readFileSync(join(dir, "lighthouse.json"), "utf8")), rawReport);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
