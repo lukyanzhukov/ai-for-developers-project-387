@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.4.0](https://github.com/lukyanzhukov/ai-for-developers-project-387/compare/v1.3.0...v1.4.0) (2026-11-17)
+
+
+### Features
+
+* **ci:** плановый аудит доступности Call Calendar ([#106](https://github.com/lukyanzhukov/ai-for-developers-project-387/issues/106)) ([3aeb279](https://github.com/lukyanzhukov/ai-for-developers-project-387/commit/3aeb2795509ebefbfa94a79b54d5ec1f581874e6))
+* **ci:** плановый аудит доступности Call Calendar ([#106](https://github.com/lukyanzhukov/ai-for-developers-project-387/issues/106)) ([8114d9e](https://github.com/lukyanzhukov/ai-for-developers-project-387/commit/8114d9e5dd7ef339b755a690c9f2315db6e9ab65))
+
+
+### Bug Fixes
+
+* **ci:** завершить подготовку проекта к сдаче ([#106](https://github.com/lukyanzhukov/ai-for-developers-project-387/issues/106)) ([75ab056](https://github.com/lukyanzhukov/ai-for-developers-project-387/commit/75ab056a716f0c6606f39694401931d8464898bf))
+* **ci:** завершить подготовку проекта к сдаче ([#106](https://github.com/lukyanzhukov/ai-for-developers-project-387/issues/106)) ([a89e1e0](https://github.com/lukyanzhukov/ai-for-developers-project-387/commit/a89e1e02bc2699f78577309b1ec8b9c7ad800b5a))
+* **ci:** использовать порт mise в Lighthouse-аудите ([#109](https://github.com/lukyanzhukov/ai-for-developers-project-387/issues/109)) ([c2d4328](https://github.com/lukyanzhukov/ai-for-developers-project-387/commit/c2d43288dcb7aec9fc52d0cc1ca690f2ac9917c0))
+* **ci:** использовать порт mise в Lighthouse-аудите ([#109](https://github.com/lukyanzhukov/ai-for-developers-project-387/issues/109)) ([2d3ad01](https://github.com/lukyanzhukov/ai-for-developers-project-387/commit/2d3ad01cb4160f41b5c0b84607284873011113f1))
+* повысить контраст текста на главной ([#114](https://github.com/lukyanzhukov/ai-for-developers-project-387/issues/114)) ([e7d4d72](https://github.com/lukyanzhukov/ai-for-developers-project-387/commit/e7d4d721a74b8b63b97ee0600ce8757e28e011cd))
+* повысить контраст текста на главной ([#114](https://github.com/lukyanzhukov/ai-for-developers-project-387/issues/114)) ([18ef2a7](https://github.com/lukyanzhukov/ai-for-developers-project-387/commit/18ef2a7a1209be9bf8eeec9e69f7b58eac632632))
+
 ## [1.3.0](https://github.com/lukyanzhukov/ai-for-developers-project-387/compare/v1.2.1...v1.3.0) (2026-11-17)
 
 ### Features
