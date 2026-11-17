@@ -149,6 +149,12 @@ export function UpcomingBookings() {
           placeholder="Имя или email гостя"
           value={query}
           onChange={(event) => setQuery(event.currentTarget.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Escape" && query) {
+              event.preventDefault();
+              setQuery("");
+            }
+          }}
           leftSection={<SearchGlyph />}
           rightSection={
             query ? (
