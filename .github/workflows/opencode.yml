@@ -78,6 +78,7 @@ jobs:
           ref: ${{ github.event.repository.default_branch }}
           persist-credentials: false
       - name: Check command budget
+        timeout-minutes: 2
         id: budget
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
         with:
@@ -132,9 +133,10 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 3
     permissions:
+      actions: read
       contents: read
       issues: write
-      pull-requests: read
+      pull-requests: write
     steps:
       - name: Checkout trusted reporter
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7

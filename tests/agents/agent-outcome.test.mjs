@@ -156,3 +156,75 @@ test(
     }
   },
 );
+
+test("reporter preserves failure evidence when the PR API is unavailable", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "outcome-offline-"));
+  const comments = [];
+  try {
+    const result = await publishOutcome({
+      github: {
+        rest: {
+          pulls: {
+            get: async () => {
+              throw new Error("offline");
+            },
+          },
+          issues: { createComment: async (args) => comments.push(args) },
+        },
+      },
+      context: { repo: { owner: "owner", repo: "calendar" } },
+      input: {
+        reason: "infra",
+        number: "7",
+        isPR: "true",
+        sha: "a".repeat(40),
+        runUrl: "https://example.test/logs",
+      },
+      summary: {
+        addRaw() {
+          return { write: async () => {} };
+        },
+      },
+      directory,
+    });
+    assert.equal(result.used, null);
+    assert.equal(result.reason, "infra");
+    assert.equal(result.detail, "current_sha_unavailable");
+    assert.match(comments[0].body, /неизвестен\/3/);
+    assert.equal(JSON.parse(await readFile(join(directory, "agent-outcome.json"))).reason, "infra");
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("Actions job timeout is distinguished from an interrupted agent or tool setup", async () => {
+  assert.equal(
+    outcome({
+      ...healthy,
+      reason: "agent_failed",
+      jobResult: "failure",
+      jobConclusion: "timed_out",
+      modelStarted: true,
+    }).reason,
+    "timeout",
+  );
+  assert.equal(
+    outcome({ ...healthy, jobResult: "failure", jobConclusion: "timed_out", modelStarted: false })
+      .reason,
+    "infra",
+  );
+});
+
+test("PR reporters have write permission and no model secret", async () => {
+  for (const file of ["opencode.yml", "opencode-pr-review.yml"]) {
+    const text = await readFile(
+      new URL("../../.github/workflows/" + file, import.meta.url),
+      "utf8",
+    );
+    const report = text.split("\n  report:\n")[1];
+    assert.ok(report);
+    assert.match(report, /pull-requests: write/);
+    assert.match(report, /actions: read/);
+    assert.ok(!report.includes("secrets.OPENCODE_API_KEY"));
+  }
+});
