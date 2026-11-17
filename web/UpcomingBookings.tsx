@@ -265,7 +265,7 @@ export function UpcomingBookings() {
         )}
         <Group justify="space-between" mt="sm" gap="xs">
           <Text size="xs" c="dimmed">
-            Часть имени или email, без учёта регистра; пустой выбор типов означает «Все типы»
+            Часть имени или email, без учёта регистра
           </Text>
           {data && (
             <Text size="xs" fw={600} className="owner-search-count">

@@ -342,6 +342,23 @@ async function neighborBehaviour(viewport: Viewport) {
   );
 }
 
+async function searchHintUnchanged(viewport: Viewport) {
+  await withPage(
+    meetingTypes,
+    { now: ["2026-11-09T01:00:00Z"], bookings },
+    async (page, server) => {
+      await page.goto(`${server.address}/admin?view=bookings`);
+      await page.getByText("Анна Иванова").first().waitFor();
+      const hint = page
+        .locator(".owner-search-field p")
+        .filter({ hasText: "Часть имени или email" });
+      expect(await hint.count()).toBe(1);
+      expect((await hint.textContent())?.trim()).toBe("Часть имени или email, без учёта регистра");
+    },
+    viewport,
+  );
+}
+
 async function retriesFirstLoad(viewport: Viewport) {
   await withPage(
     meetingTypes,
@@ -441,6 +458,7 @@ for (const viewport of viewports) {
     duplicateTitles(viewport));
   test(`without a type filter search and calendar behave as before at ${viewport.width}px`, () =>
     neighborBehaviour(viewport));
+  test(`search hint stays unchanged at ${viewport.width}px`, () => searchHintUnchanged(viewport));
   test(`owner retries a failed first meeting type load at ${viewport.width}px`, () =>
     retriesFirstLoad(viewport));
   test(`owner keeps the filter when a meeting type refresh fails at ${viewport.width}px`, () =>
