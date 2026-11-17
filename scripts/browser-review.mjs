@@ -10,8 +10,10 @@ const root = process.cwd();
 const output = resolve(process.env.EVIDENCE_DIR || "artifacts/browser");
 await mkdir(output, { recursive: true });
 const sha = execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim();
+const profile = process.env.BROWSER_PROFILE || "search";
 const report = {
   sha,
+  profile,
   expectedSha: process.env.REVIEW_SHA || sha,
   checkerSha: process.env.CHECKER_SHA || null,
   checkerDigest: createHash("sha256")
@@ -19,7 +21,12 @@ const report = {
     .digest("hex"),
   pr: process.env.PR_NUMBER || null,
   runUrl: process.env.RUN_URL || null,
-  sources: ["https://github.com/lukyanzhukov/ai-for-developers-project-387/issues/84"],
+  sources: [
+    "https://github.com/lukyanzhukov/ai-for-developers-project-387/issues/84",
+    ...(profile === "keyboard-search"
+      ? ["https://github.com/lukyanzhukov/ai-for-developers-project-387/issues/91"]
+      : []),
+  ],
   startedAt: new Date().toISOString(),
   steps: [],
   status: "failed",
@@ -49,6 +56,7 @@ async function step(name, expected, inspect) {
 }
 
 try {
+  assert.ok(["search", "keyboard-search"].includes(profile), "Unknown browser profile");
   assert.match(report.sha, /^[a-f0-9]{40}$/);
   assert.equal(report.sha, report.expectedSha, "Checkout differs from the requested PR head");
   execFileSync("git", ["diff", "--quiet", "HEAD", "--", "web", "server", "api", "generated"]);
@@ -136,6 +144,83 @@ try {
       return { query: await search.inputValue(), count: await cards().count() };
     });
   }
+  if (profile === "keyboard-search") {
+    await page.locator("label").filter({ hasText: "Список" }).click();
+    await step("keyboard-list-clear", { query: "", focused: true, count: 3 }, async () => {
+      await search.fill("Анна");
+      await search.press("Escape");
+      return {
+        query: await search.inputValue(),
+        focused: await search.evaluate((el) => document.activeElement === el),
+        count: await cards().count(),
+      };
+    });
+    await page.locator("label").filter({ hasText: "Календарь" }).click();
+    await page.getByRole("button", { name: "2026-11-11", exact: true }).click();
+    await step(
+      "keyboard-calendar-clear",
+      { query: "", focused: true, count: 1, selected: "true", boris: true },
+      async () => {
+        await search.fill("Анна");
+        await search.press("Escape");
+        return {
+          query: await search.inputValue(),
+          focused: await search.evaluate((el) => document.activeElement === el),
+          count: await cards().count(),
+          selected: await page
+            .getByRole("button", { name: "2026-11-11", exact: true })
+            .getAttribute("aria-pressed"),
+          boris: (await cards().allTextContents()).some((text) => text.includes("Борис")),
+        };
+      },
+    );
+    await step(
+      "keyboard-empty-repeat",
+      { query: "", focused: true, count: 1, selected: "true" },
+      async () => {
+        await search.press("Escape");
+        await search.press("Escape");
+        return {
+          query: await search.inputValue(),
+          focused: await search.evaluate((el) => document.activeElement === el),
+          count: await cards().count(),
+          selected: await page
+            .getByRole("button", { name: "2026-11-11", exact: true })
+            .getAttribute("aria-pressed"),
+        };
+      },
+    );
+    const refresh = page.getByRole("button", { name: "Обновить", exact: true });
+    await step("keyboard-outside-field", { query: "Анна", count: 2 }, async () => {
+      await search.fill("Анна");
+      await refresh.focus();
+      await page.keyboard.press("Escape");
+      return { query: await search.inputValue(), count: await cards().count() };
+    });
+    await step("keyboard-refresh-neighbor", { query: "Анна", count: 2 }, async () => {
+      await Promise.all([
+        page.waitForResponse((r) => r.url().endsWith("/api/bookings")).then((r) => r.finished()),
+        refresh.click(),
+      ]);
+      await refresh.waitFor({ state: "visible" });
+      await page.waitForFunction(
+        () =>
+          ![...document.querySelectorAll("button")].find((b) => b.textContent.trim() === "Обновить")
+            ?.disabled,
+      );
+      return { query: await search.inputValue(), count: await cards().count() };
+    });
+    await step("keyboard-cross-neighbor", { query: "", count: 1, selected: "true" }, async () => {
+      await page.getByRole("button", { name: "Очистить поиск", exact: true }).click();
+      return {
+        query: await search.inputValue(),
+        count: await cards().count(),
+        selected: await page
+          .getByRole("button", { name: "2026-11-11", exact: true })
+          .getAttribute("aria-pressed"),
+      };
+    });
+  }
   report.status = "passed";
 } catch (error) {
   report.error = error.message;
@@ -156,6 +241,7 @@ try {
     resolve(output, "report.md"),
     [
       `# Browser review: ${report.status}`,
+      `Profile: ${profile}`,
       `Head SHA: \`${sha}\``,
       `Checker SHA: \`${report.checkerSha}\``,
       `PR: ${report.pr}`,

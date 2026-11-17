@@ -2,7 +2,7 @@ name: Independent browser review
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
+    types: [opened, synchronize, reopened, ready_for_review, labeled, unlabeled]
   workflow_dispatch:
     inputs:
       pr_number:
@@ -43,8 +43,10 @@ jobs:
           script: |
             const fs = require('node:fs');
             const { execFileSync } = require('node:child_process');
-            const { target } = require('./scripts/review-policy.cjs');
+            const { target, browserProfile } = require('./scripts/review-policy.cjs');
             const pr = await target({ github, context });
+            const { data: details } = await github.rest.pulls.get({ ...context.repo, pull_number: pr.number });
+            core.setOutput('profile', browserProfile(details.labels));
             for (const [key, value] of Object.entries(pr)) core.setOutput(key, String(value));
             execFileSync('git', ['cat-file', '-e', pr.baseSha]);
             const exists = execFileSync('git', ['ls-tree', '--name-only', pr.baseSha, 'scripts/browser-review.mjs'], { encoding: 'utf8' }).trim();
@@ -82,6 +84,7 @@ jobs:
         timeout-minutes: 3
         env:
           REVIEW_SHA: ${{ steps.target.outputs.sha }}
+          BROWSER_PROFILE: ${{ steps.target.outputs.profile }}
           CHECKER_SHA: ${{ steps.target.outputs.checkerSha }}
           PR_NUMBER: ${{ steps.target.outputs.number }}
           RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
@@ -93,10 +96,16 @@ jobs:
         env:
           PR_NUMBER: ${{ steps.target.outputs.number }}
           REVIEW_SHA: ${{ steps.target.outputs.sha }}
+          BROWSER_PROFILE: ${{ steps.target.outputs.profile }}
         with:
           script: |
             const fs = require('node:fs');
+            const file = `${process.env.RUNNER_TEMP}/browser-evidence/report.json`;
+            const checked = JSON.parse(fs.readFileSync(file, 'utf8'));
+            if ((checked.profile || 'search') !== process.env.BROWSER_PROFILE) throw new Error('Base checker does not support the required browser profile');
+            const { browserProfile } = require('./scripts/review-policy.cjs');
             const { data: pr } = await github.rest.pulls.get({ ...context.repo, pull_number: Number(process.env.PR_NUMBER) });
+            if (browserProfile(pr.labels) !== process.env.BROWSER_PROFILE) throw new Error('Browser profile changed; repeat the check');
             if (pr.head.sha !== process.env.REVIEW_SHA || pr.state !== 'open') {
               const path = `${process.env.RUNNER_TEMP}/browser-evidence/report.json`;
               const report = JSON.parse(fs.readFileSync(path, 'utf8'));
@@ -122,9 +131,12 @@ jobs:
         env:
           PR_NUMBER: ${{ steps.target.outputs.number }}
           REVIEW_SHA: ${{ steps.target.outputs.sha }}
+          BROWSER_PROFILE: ${{ steps.target.outputs.profile }}
           ARTIFACT_URL: ${{ steps.artifact.outputs.artifact-url }}
         with:
           script: |
+            const { browserProfile } = require('./scripts/review-policy.cjs');
             const { data: pr } = await github.rest.pulls.get({ ...context.repo, pull_number: Number(process.env.PR_NUMBER) });
+            if (browserProfile(pr.labels) !== process.env.BROWSER_PROFILE) throw new Error('Browser profile changed; repeat the check');
             if (pr.head.sha !== process.env.REVIEW_SHA || pr.state !== 'open') throw new Error('Head changed before publication');
-            await github.rest.issues.createComment({ ...context.repo, issue_number: pr.number, body: `Браузерная проверка пройдена. Head SHA: \`${process.env.REVIEW_SHA}\`. Основной, негативный и соседний сценарии поиска по #84 проверены отдельно от реализации. [Отчёт и снимки](${process.env.ARTIFACT_URL}).` });
+            await github.rest.issues.createComment({ ...context.repo, issue_number: pr.number, body: `Браузерная проверка пройдена. Head SHA: \`${process.env.REVIEW_SHA}\`. Профиль: ${process.env.BROWSER_PROFILE}. Основной, негативный и соседний сценарии проверены отдельно от реализации; источники требований перечислены в отчёте. [Отчёт и снимки](${process.env.ARTIFACT_URL}).` });

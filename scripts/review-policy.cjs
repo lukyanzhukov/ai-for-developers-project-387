@@ -78,4 +78,16 @@ async function reserveReview({ github, context, limit = 3 }) {
   return { ...result, used: used + 1 };
 }
 
-module.exports = { reserveReview, target, reservation, ATTEMPT };
+function browserProfile(labels = []) {
+  const names = labels.map((label) => label.name);
+  if (
+    names.some(
+      (name) =>
+        typeof name === "string" && name.startsWith("browser:") && name !== "browser:keyboard",
+    )
+  )
+    throw new Error("Unknown browser profile label");
+  return names.includes("browser:keyboard") ? "keyboard-search" : "search";
+}
+
+module.exports = { reserveReview, target, reservation, browserProfile, ATTEMPT };

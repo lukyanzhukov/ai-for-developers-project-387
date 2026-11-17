@@ -154,6 +154,8 @@ gh workflow run opencode-pr-review.yml --ref main -f pr_number=123
 
 Workflow [browser-review.yml](.github/workflows/browser-review.yml) независимо запускает собранное приложение на точном PR head с локальными данными. Проверяются основной, негативный и соседний сценарии поиска из [спецификации #84](https://github.com/lukyanzhukov/ai-for-developers-project-387/issues/84). Checker берётся с base-ветки, поэтому новый тест реализатора его не подменяет; при первом добавлении checker его исходный SHA также записывается. Артефакт `browser-...` содержит JSON/Markdown-отчёт, полный SHA приложения и checker, шаги actual/expected, результат и снимки. Он хранится 14 дней. Падение браузера даёт failed check; изменение head требует новой проверки. Для новой функции расширяйте независимые сценарии по согласованной спецификации отдельным изменением checker.
 
+Метка PR `browser:keyboard` включает профиль `keyboard-search` по [спецификации #91](https://github.com/lukyanzhukov/ai-for-developers-project-387/issues/91): Escape в поле, сохранение фокуса/режима/даты, пустое поле/повторное нажатие, Escape вне поля и сохранение соседних действий. Без метки работает профиль `search`. Изменение метки запускает проверку заново. Если base-checker ещё не поддерживает нужный профиль, check падает вместо публикации общего отчёта как проверки клавиатуры. Проверенный профиль указан в JSON/Markdown и комментарии PR.
+
 ```bash
 gh workflow run browser-review.yml --ref main -f pr_number=123
 ```
