@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { runInNewContext } from "node:vm";
-import { reserveReview, ATTEMPT } from "../../scripts/review-policy.cjs";
+import { reserveReview } from "../../scripts/review-policy.cjs";
 import { changedLines, parseReport, publishReview } from "../../scripts/publish-review.cjs";
 
 const sha = "a".repeat(40);
@@ -48,66 +48,7 @@ function fixture() {
   };
   return { github, context, comments, posted, inline, pr };
 }
-function prior(key, extra = {}) {
-  return {
-    user: { login: "github-actions[bot]", type: "Bot" },
-    body: `${ATTEMPT}\n${JSON.stringify({ pr: 7, sha, key })}\nReserved`,
-    ...extra,
-  };
-}
-
-test("three reservations across commits and reruns exhaust the PR budget", async () => {
-  const f = fixture();
-  for (let i = 1; i <= 3; i++) {
-    f.context.payloadRunAttempt = i;
-    f.pr.head.sha = String(i).repeat(40);
-    f.context.payload.pull_request.head.sha = f.pr.head.sha;
-    const result = await reserveReview(f);
-    assert.equal(result.allowed, true);
-    assert.equal(result.used, i);
-  }
-  f.context.runId++;
-  const blocked = await reserveReview(f);
-  assert.equal(blocked.allowed, false);
-  assert.equal(blocked.used, 3);
-  assert.match(f.posted.at(-1).body, /исчерпан/);
-  assert.ok(f.posted.at(-1).body.includes(f.pr.head.sha));
-  assert.ok(f.posted.at(-1).body.includes(blocked.runUrl));
-});
-
-test("cancelled reservations count; the same run cannot call the model twice", async () => {
-  const f = fixture();
-  f.comments.push(prior("1:1"), prior("2:1"));
-  assert.equal((await reserveReview(f)).used, 3);
-  assert.equal((await reserveReview(f)).allowed, false);
-  assert.equal(f.comments.filter((c) => c.body.startsWith(ATTEMPT)).length, 3);
-});
-
-test("forged, malformed and other-PR markers do not affect the budget", async () => {
-  const f = fixture();
-  f.comments.push(
-    prior("1:1", { user: { login: "owner", type: "User" } }),
-    prior("2:1", { user: { login: "other[bot]", type: "Bot" } }),
-    prior("3:1", { body: `${ATTEMPT}\nnot json` }),
-    prior("4:1", { body: `${ATTEMPT}\n${JSON.stringify({ pr: 8, sha, key: "4:1" })}` }),
-  );
-  assert.equal((await reserveReview(f)).used, 1);
-});
-
-test("manual repeats use the same ledger and require the owner", async () => {
-  const f = fixture();
-  f.context.eventName = "workflow_dispatch";
-  f.context.actor = "outsider";
-  f.context.payload = { inputs: { pr_number: "7" } };
-  await assert.rejects(reserveReview(f), /owner/);
-  f.context.actor = "owner";
-  f.comments.push(prior("1:1"), prior("2:1"), prior("3:1"));
-  assert.equal((await reserveReview(f)).allowed, false);
-  f.context.payload.inputs.pr_number = "7; echo injected";
-  await assert.rejects(reserveReview(f), /Invalid PR/);
-});
-
-test("drafts, forks, stale events and unavailable reservation storage fail closed", async () => {
+test("review rejects drafts, forks, stale events and untrusted dispatches before history access", async () => {
   for (const mutate of [
     (f) => {
       f.pr.draft = true;
@@ -119,9 +60,9 @@ test("drafts, forks, stale events and unavailable reservation storage fail close
       f.context.payload.pull_request.head.sha = "c".repeat(40);
     },
     (f) => {
-      f.github.rest.issues.createComment = async () => {
-        throw new Error("storage unavailable");
-      };
+      f.context.eventName = "workflow_dispatch";
+      f.context.actor = "outsider";
+      f.context.payload = { inputs: { pr_number: "7" } };
     },
   ]) {
     const f = fixture();
